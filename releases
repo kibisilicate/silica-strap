@@ -1,0 +1,203 @@
+#! /usr/bin/env bash
+
+shopt -s extglob
+
+declare debian_current_suites="@($(
+  declare -a suites=(
+    'unstable'
+    'testing'
+    'stable'
+    'oldstable'
+    'oldoldstable'
+    'sid'
+    'trixie'
+    'bookworm'
+    'bullseye'
+    'buster'
+    'stretch'
+  )
+  echo "${suites[@]}" | tr ' ' '|'
+  unset suites
+))"
+
+print_message 'debug' "Debian current suites           '$debian_current_suites'"
+
+declare debian_obsolete_suites="@($(
+  declare -a suites=(
+    'oldoldoldstable'
+    'jessie'
+  )
+  echo "${suites[@]}" | tr ' ' '|'
+  unset suites
+))"
+
+print_message 'debug' "Debian obsolete suites          '$debian_obsolete_suites'"
+
+declare debian_mirror='https://deb.debian.org/debian'
+
+declare debian_ports_mirror='https://deb.debian.org/debian-ports'
+
+declare debian_old_mirror='http://archive.debian.org/debian'
+
+declare ubuntu_current_suites="@($(
+  declare -a suites=(
+    'devel'
+    'kinetic'
+    'jammy'
+    'impish'
+    'hirsute'
+    'focal'
+    'bionic'
+    'xenial'
+    'trusty'
+  )
+  echo "${suites[@]}" | tr ' ' '|'
+  unset suites
+))"
+
+print_message 'debug' "Ubuntu current suites           '$ubuntu_current_suites'"
+
+declare ubuntu_obsolete_suites="@($(
+  declare -a suites=(
+    'groovy'
+    'eoan'
+    'disco'
+    'cosmic'
+    'artful'
+    'zesty'
+    'yakkety'
+    'wily'
+    'vivid'
+    'utopic'
+    'saucy'
+    'raring'
+    'quantal'
+    'precise'
+  )
+  echo "${suites[@]}" | tr ' ' '|'
+  unset suites
+))"
+
+print_message 'debug' "Ubuntu obsolete suites          '$ubuntu_obsolete_suites'"
+
+declare ubuntu_mirror='http://archive.ubuntu.com/ubuntu'
+
+declare ubuntu_ports_mirror='http://ports.ubuntu.com/ubuntu-ports'
+
+declare ubuntu_old_mirror='https://old-releases.ubuntu.com/ubuntu'
+
+function check_primary_suite {
+  case "$1" in
+    $debian_current_suites | $debian_obsolete_suites | $ubuntu_current_suites | $ubuntu_obsolete_suites) ;;
+
+    *)
+      return 1
+      ;;
+  esac
+}
+
+function suite_specific_extras {
+  case "$1" in
+    essential | custom) ;;
+
+    *)
+      echo 'ca-certificates'
+      case "$2" in
+        stretch | jessie | oldoldstable | oldoldoldstable | zesty | yakkety | xenial | wily | vivid | utopic | trusty | saucy | raring | quantal | precise)
+          echo 'apt-transport-https'
+          ;;
+      esac
+      ;;
+  esac
+  declare -a include_packages+=('ca-certificates')
+}
+
+function default_output_file_name {
+  case "$1" in
+    $debian_current_suites | $debian_obsolete_suites)
+      echo "Debian_$1_$2" # $(date +'%b-%d-%Y')
+      ;;
+    $ubuntu_current_suites | $ubuntu_obsolete_suites)
+      echo "Ubuntu_$1_$2" # $(date +'%b-%d-%Y')
+      ;;
+  esac
+}
+
+function default_full_mirror_uri {
+  case "$1" in
+    $debian_current_suites)
+      case "$2" in
+        amd64 | arm64 | armel | armhf | i386 | mips64el | mipsel | ppc64el | s390x)
+          echo "$debian_mirror"
+          ;;
+        *)
+          echo "$debian_ports_mirror"
+          ;;
+      esac
+      ;;
+    $debian_obsolete_suites)
+      echo "$debian_old_mirror"
+      ;;
+    $ubuntu_current_suites)
+      case "$2" in
+        amd64 | i386)
+          echo "$ubuntu_mirror"
+          ;;
+        *)
+          echo "$ubuntu_ports_mirror"
+          ;;
+      esac
+      ;;
+    $ubuntu_obsolete_suites)
+      echo "$ubuntu_old_mirror"
+      ;;
+  esac
+}
+
+# see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
+
+function default_merged_usr {
+  case "$1" in
+    $debian_current_suites | $debian_obsolete_suites)
+      case "$2" in
+        # Debian releases keep the variant 'buildd' split-usr by default.
+        buildd)
+          echo 'none'
+          ;;
+        *)
+          case "$1" in
+            # merged-usr blacklist for past Debian releases.
+            stretch | jessie | oldoldstable | oldoldoldstable)
+              echo 'none'
+              ;;
+            *)
+              echo 'aliased-dirs'
+              ;;
+          esac
+          ;;
+      esac
+      ;;
+    $ubuntu_current_suites | $ubuntu_obsolete_suites)
+      case "$1" in
+        # merged-usr blacklist for past Ubuntu releases.
+        groovy | focal | eoan | disco | cosmic | bionic | artful | zesty | yakkety | xenial | wily | vivid | utopic | trusty | saucy | raring | quantal | precise)
+          echo 'none'
+          ;;
+          # for hirsute keep the variant 'buildd' split-usr by default and merged-usr for all other variants.
+        hirsute)
+          case "$2" in
+            buildd)
+              echo 'none'
+              ;;
+            *)
+              echo 'aliased-dirs'
+              ;;
+          esac
+          ;;
+        *)
+          echo 'aliased-dirs'
+          ;;
+      esac
+      ;;
+  esac
+}

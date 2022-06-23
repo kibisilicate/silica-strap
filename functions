@@ -1,0 +1,222 @@
+#! /usr/bin/env bash
+
+function print_usage_message {
+  cat << 'usage_message'
+Place holder.
+usage_message
+}
+
+function mount_virtual_kernel_file_systems {
+  print_message 'debug' "bind mounting '/dev' to '$1/dev'"
+  if ! mount --bind /dev "$1/dev"; then
+    print_message 'error' "failed to bind mount '/dev' to '$1/dev'"
+    return 1
+  fi
+  print_message 'debug' "bind mounting '/dev/pts' to '$1/dev/pts'"
+  if ! mount --bind /dev/pts "$1/dev/pts"; then
+    print_message 'error' "failed to bind mount '/dev/pts' to '$1/dev/pts'"
+    return 1
+  fi
+  print_message 'debug' "mounting 'proc' to '$1/proc'"
+  if ! mount --types proc proc "$1/proc"; then
+    print_message 'error' "failed to mount 'proc' to '$1/proc'"
+    return 1
+  fi
+  print_message 'debug' "mounting 'sysfs' to '$1/sys'"
+  if ! mount --types sysfs sysfs "$1/sys"; then
+    print_message 'error' "failed to mount 'sysfs' to '$1/sys'"
+    return 1
+  fi
+  print_message 'debug' "mounting 'tmpfs' to '$1/run'"
+  if ! mount --types tmpfs tmpfs "$1/run"; then
+    print_message 'error' "failed to mount 'tmpfs' to '$1/run'"
+    return 1
+  fi
+  if [ ! -d "$1/run/lock" ]; then
+    print_message 'debug' "creating directory '$1/run/lock'"
+    mkdir "$1/run/lock"
+  fi
+  if [ -L "$1/dev/shm" ]; then
+    print_message 'debug' "creating directory '$1/$(readlink "$1/dev/shm")'"
+    mkdir "$1/$(readlink "$1/dev/shm")"
+  fi
+}
+
+function unmount_virtual_kernel_file_systems {
+  if mount | grep --quiet --fixed-strings "$1/dev/pts"; then
+    print_message 'debug' "unmounting '$1/dev/pts'"
+    if ! umount --force "$1/dev/pts"; then
+      print_message 'error' "failed to unmount directory '$1/dev/pts'"
+      return 1
+    fi
+  fi
+  if mount | grep --quiet --fixed-strings "$1/dev"; then
+    print_message 'debug' "unmounting '$1/dev'"
+    if ! umount --force "$1/dev"; then
+      print_message 'error' "failed to unmount directory '$1/dev'"
+      return 1
+    fi
+  fi
+  if mount | grep --quiet --fixed-strings "$1/run"; then
+    print_message 'debug' "unmounting '$1/run'"
+    if ! umount --force "$1/run"; then
+      print_message 'error' "failed to unmount directory '$1/run'"
+      return 1
+    fi
+  fi
+  if mount | grep --quiet --fixed-strings "$1/sys"; then
+    print_message 'debug' "unmounting '$1/sys'"
+    if ! umount --force "$1/sys"; then
+      print_message 'error' "failed to unmount directory '$1/sys'"
+      return 1
+    fi
+  fi
+  if mount | grep --quiet --fixed-strings "$1/proc"; then
+    print_message 'debug' "unmounting '$1/proc'"
+    if ! umount --force "$1/proc"; then
+      print_message 'error' "failed to unmount directory '$1/proc'"
+      return 1
+    fi
+  fi
+}
+
+function clean_up {
+  if [ -d "$workspace" ]; then
+    if [ -n "$environment" ] && [ -d "$environment" ]; then
+      if ! unmount_virtual_kernel_file_systems "$environment"; then
+        print_message 'error' "not removing directory '$workspace' while file systems are still mounted."
+        exit 1
+      fi
+    fi
+    if [ -n "$target" ] && [ -d "$target" ]; then
+      if ! unmount_virtual_kernel_file_systems "$target"; then
+        print_message 'error' "not removing directory '$workspace' while file systems are still mounted."
+        exit 1
+      fi
+    fi
+    if [ "$keep_workspace" = 'true' ]; then
+      print_message 'debug' "not removing directory '$workspace'"
+    else
+      print_message 'debug' "removing temporary directory '$workspace'"
+      rm --recursive "$workspace"
+    fi
+  fi
+  print_message 'debug' 'silica-strap exiting now.'
+  if [ "$use_alternate_screen_buffer" = 'true' ]; then
+    clear
+    tput rmcup
+  fi
+}
+
+function catch_ctrl_c {
+  echo ''
+  print_message 'debug' 'interrupt caught.'
+  exit 0
+}
+
+function fetch_package_list {
+  local package_list_uri="$1://$2/dists/$3/$4/binary-$5"
+  print_message 'debug' "downloading package list with '$downloader'"
+  for package_list in 'Packages.xz' 'Packages.gz' 'Packages.bz2' 'Packages'; do
+    print_message 'debug' "downloading '$package_list_uri/$package_list'"
+    case "$downloader" in
+      'curl') curl --silent --remote-name "$package_list_uri/$package_list" ;;
+      'wget') wget --quiet "$package_list_uri/$package_list" ;;
+    esac
+    if [ "$?" != '0' ]; then
+      print_message 'debug' 'failed, skipping.'
+      continue
+    fi
+    print_message 'debug' "decompressing '$(pwd)/$package_list'"
+    case "$package_list" in
+      Packages.bz2) bzip2 --decompress "./$package_list" ;;
+      Packages.gz) gzip --decompress "./$package_list" ;;
+      Packages.xz) xz --decompress "./$package_list" ;;
+    esac
+    break 1
+  done
+  if [ ! -f "$(pwd)/Packages" ]; then
+    print_message 'error' 'failed to download package list.'
+    return 1
+  fi
+}
+
+function compress_and_move_output_file {
+  echo 'Compressing (this might take a while) ...'
+  print_message 'debug' "compressing '$1' with '$output_compression'"
+  case "$output_compression" in
+    'bzip2')
+      bzip2 --compress --force --quiet "$1"
+      print_message 'debug' "moving '$1.bz2' to '$2'"
+      mv "$1.bz2" "$2"
+      ;;
+    'gzip')
+      gzip --force --quiet "$1"
+      print_message 'debug' "moving '$1.gz' to '$2'"
+      mv "$1.gz" "$2"
+      ;;
+    'xz')
+      xz --compress --force --quiet "$1"
+      print_message 'debug' "moving '$1.xz' to '$2'"
+      mv "$1.xz" "$2"
+      ;;
+    'zstd')
+      zstd --compress --rm --force --quiet "$1"
+      print_message 'debug' "moving '$1.zst' to '$2'"
+      mv "$1.zst" "$2"
+      ;;
+  esac
+}
+
+function extract_deb_field {
+  case "$extractor" in
+    'ar')
+      local tarball="$(ar -t "$1" | grep --regexp='^control.tar')"
+      ar -p "$1" "$tarball" | case "$tarball" in
+        control.tar) cat ;;
+        control.tar.bz2) bzip2 --decompress --stdout --force ;;
+        control.tar.gz) gzip --decompress --to-stdout --force ;;
+        control.tar.xz) xz --decompress --to-stdout --force ;;
+        control.tar.zst) zstd --decompress --stdout --force ;;
+      esac | tar --extract ./control --to-stdout
+      ;;
+    host-dpkg-deb) dpkg-deb --field "$1" ;;
+    env-dpkg-deb)
+      chroot "$environment" /usr/bin/env --ignore-environment bash -c "
+export HOME='/root'
+export TERM='$term_env_var'
+
+dpkg-deb --field '$(echo "$1" | sed --expression "s#$environment##")'
+"
+      ;;
+  esac
+}
+
+function extract_deb_data {
+  echo "Extracting $(basename "$1") ..."
+  case "$extractor" in
+    'ar')
+      local tarball="$(ar -t "$1" | grep --regexp='^data.tar')"
+      ar -p "$1" "$tarball" | case "$tarball" in
+        data.tar) cat ;;
+        data.tar.bz2) bzip2 --decompress --stdout --force ;;
+        data.tar.gz) gzip --decompress --to-stdout --force ;;
+        data.tar.xz) xz --decompress --to-stdout --force ;;
+        data.tar.zst) zstd --decompress --stdout --force ;;
+      esac
+      ;;
+    host-dpkg-deb) dpkg-deb --fsys-tarfile "$1" ;;
+    env-dpkg-deb)
+      chroot "$environment" /usr/bin/env --ignore-environment bash -c "
+export HOME='/root'
+export TERM='$term_env_var'
+
+dpkg-deb --fsys-tarfile '$(echo "$1" | sed --expression "s#$environment##")'
+"
+      ;;
+  esac | tar --extract --keep-directory-symlink --directory="$2"
+  if [ "$?" != '0' ]; then
+    print_message 'error' "failed to extract '$(basename "$1")'"
+    return 1
+  fi
+}
