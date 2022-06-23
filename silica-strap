@@ -20,15 +20,15 @@ for key in "${!chosen_arguments[@]}"; do
       declare chosen_colorful_output="${chosen_arguments#*=}"
       unset chosen_arguments[key]
       ;;
-    --debug)
+    -d | --debug)
       declare debug_output='true'
       unset chosen_arguments[key]
       ;;
-    --help)
+    -h | --help)
       declare print_usage_then_exit='true'
       unset chosen_arguments[key]
       ;;
-    --version)
+    -V | --version)
       declare print_version_then_exit='true'
       unset chosen_arguments[key]
       ;;
@@ -190,49 +190,49 @@ print_message 'debug' "environment cache               '$environment_cache'"
 
 for argument in "${chosen_arguments[@]}"; do
   case "$argument" in
-    --arch=* | --architecture=* | --architectures=*)
+    -a=* | --arch=* | --architecture=* | --architectures=*)
       declare -a chosen_architectures+=($(echo "${argument#*=}" | tr '[:upper:]' '[:lower:]' | tr ',' ' '))
       ;;
-    --release=* | --releases=*)
+    -r=* | --release=* | --releases=*)
       declare -a suites+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    --comp=* | --component=* | --components=*)
+    -c=* | --comp=* | --component=* | --components=*)
       declare -a components+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    --variant=*)
+    -v=* | --variant=*)
       declare chosen_variant="${argument#*=}"
       ;;
-    --package-set=*)
+    -p=* | --package-set=*)
       declare -a custom_package_set+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    --include=*)
+    -i=* | --include=*)
       declare -a include_packages+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    --install=*)
+    -I=* | --install=*)
       declare -a install_packages+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    --exclude=*)
+    -e=* | --exclude=*)
       declare -a exclude_packages+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    --forbid=*)
+    -F=* | --forbid=*)
       declare -a forbid_packages+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    --output=*)
+    -o=* | --output=*)
       declare chosen_output_location="$(realpath --quiet "${argument#*=}")"
       ;;
-    --format=*)
+    -f=* | --format=*)
       declare chosen_output_format="${argument#*=}"
       ;;
-    --compression=*)
+    -C=* | --compression=*)
       declare chosen_output_compression="${argument#*=}"
       ;;
-    --resolver=*)
+    -R=* | --resolver=*)
       declare chosen_resolver="${argument#*=}"
       ;;
-    --downloader=*)
+    -D=* | --downloader=*)
       declare chosen_downloader="${argument#*=}"
       ;;
-    --extractor=*)
+    -E=* | --extractor=*)
       declare chosen_extractor="${argument#*=}"
       ;;
     --extract-all)
@@ -323,10 +323,10 @@ for argument in "${chosen_arguments[@]}"; do
     --discard-output)
       declare discard_output='true'
       ;;
-    --yes | --assume-yes)
+    -y | --yes | --assume-yes)
       declare assume_user_input='assume-yes'
       ;;
-    --no | --assume-no)
+    -n | --no | --assume-no)
       declare assume_user_input='assume-no'
       ;;
     *)
