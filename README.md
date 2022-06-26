@@ -30,10 +30,10 @@ Basic silica-strap usage:
 sudo silica-strap -r=unstable -o=/mnt
 ```
 
-Using apt to resolve dependencies:
+Using the internal dependency resolver:
 
 ```
-sudo silica-strap -r=unstable -R=apt -o=/mnt
+sudo silica-strap -r=unstable -R=internal -o=/mnt
 ```
 
 Outputting to a tarball:
