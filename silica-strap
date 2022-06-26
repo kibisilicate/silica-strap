@@ -791,11 +791,7 @@ unset implied_compression
 ################################################################
 
 if [ -z "$chosen_resolver" ]; then
-  if [ -f "$environment_cache" ]; then
-    declare chosen_resolver='apt'
-  else
-    declare chosen_resolver='internal'
-  fi
+  declare chosen_resolver='apt'
 fi
 
 case "$chosen_resolver" in
