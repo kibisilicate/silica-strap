@@ -27,24 +27,24 @@ sudo ./scripts/install.sh
 Basic silica-strap usage:
 
 ```
-sudo silica-strap -r=unstable -o=/mnt
+sudo silica-strap -r unstable -o /mnt
 ```
 
 Using the internal dependency resolver:
 
 ```
-sudo silica-strap -r=unstable -R=internal -o=/mnt
+sudo silica-strap -r unstable -R internal -o /mnt
 ```
 
 Outputting to a tarball:
 
 ```
-sudo silica-strap -r=unstable -f=tarball -o=./debian-unstable.tar
+sudo silica-strap -r unstable -f tarball -o ./debian-unstable.tar
 ```
 
 Creating a buildd chroot:
 
 ```
-sudo silica-strap -r=unstable -v=buildd -o=/mnt
+sudo silica-strap -r unstable -v buildd -o /mnt
 ```
 
