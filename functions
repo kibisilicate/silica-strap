@@ -142,7 +142,7 @@ function fetch_package_list {
 }
 
 function compress_and_move_output_file {
-  echo 'Compressing (this might take a while) ...'
+  echo 'Compressing ...'
   print_message 'debug' "compressing '$1' with '$output_compression'"
   case "$output_compression" in
     'bzip2')

@@ -2,37 +2,55 @@
 
 shopt -s extglob
 
-if [ -z "$1" ]; then declare print_usage_then_exit='true'; fi
+if [ -z "$1" ];
+  then declare print_usage_then_exit='true';
+fi
 
 declare version='0.0.1'
 
 declare workspace="/tmp/silica-strap_$(cat /dev/urandom | tr --delete --complement '[:alnum:]' | head --bytes=8)"
 
-for argument in "$@"; do declare -a chosen_arguments+=("$argument"); done
+for argument in "$@"; do
+  declare -a provided_arguments+=("$argument");
+done
 
-for key in "${!chosen_arguments[@]}"; do
-  case "${chosen_arguments[key]}" in
-    --alternate-screen)
-      declare use_alternate_screen_buffer='true'
-      unset chosen_arguments[key]
-      ;;
-    --color=*)
-      declare chosen_colorful_output="${chosen_arguments#*=}"
-      unset chosen_arguments[key]
-      ;;
-    -d | --debug)
-      declare debug_output='true'
-      unset chosen_arguments[key]
-      ;;
-    -h | --help)
-      declare print_usage_then_exit='true'
-      unset chosen_arguments[key]
-      ;;
-    -V | --version)
-      declare print_version_then_exit='true'
-      unset chosen_arguments[key]
-      ;;
-  esac
+for key in "${!provided_arguments[@]}"; do
+  if [ -z "$value_of_next_argument" ]; then
+    case "${provided_arguments[key]}" in
+      --alternate-screen)
+        declare use_alternate_screen_buffer='true'
+        unset provided_arguments[key]
+        ;;
+      --color=*)
+        declare chosen_colorful_output="${provided_arguments[key]#*=}"
+        unset provided_arguments[key]
+        ;;
+      --color)
+        declare value_of_next_argument='colorful-output'
+        unset provided_arguments[key]
+        ;;
+      -d | --debug)
+        declare debug_output='true'
+        unset provided_arguments[key]
+        ;;
+      -h | --help)
+        declare print_usage_then_exit='true'
+        unset provided_arguments[key]
+        ;;
+      -V | --version)
+        declare print_version_then_exit='true'
+        unset provided_arguments[key]
+        ;;
+    esac
+  else
+    case "$value_of_next_argument" in
+      colorful-output)
+        declare chosen_colorful_output="${provided_arguments[key]}"
+        unset provided_arguments[key]
+        ;;
+    esac
+    unset value_of_next_argument
+  fi
 done
 
 ################################################################
@@ -89,21 +107,33 @@ function print_message {
   case "$1" in
     error)
       case "$colorful_output" in
-        'true') echo -e "\033[01;31merror\033[00m: $2" ;;
-        'false') echo -e "error: $2" ;;
+        'true')
+          echo -e "\033[01;31merror\033[00m: $2"
+          ;;
+        'false')
+          echo -e "error: $2"
+          ;;
       esac > /dev/stderr
       ;;
     warning)
       case "$colorful_output" in
-        'true') echo -e "\033[01;33mwarning\033[00m: $2" ;;
-        'false') echo -e "warning: $2" ;;
+        'true')
+          echo -e "\033[01;33mwarning\033[00m: $2"
+          ;;
+        'false')
+          echo -e "warning: $2"
+          ;;
       esac > /dev/stderr
       ;;
     debug)
       if [ "$debug_output" = 'true' ]; then
         case "$colorful_output" in
-          'true') echo -e "\033[01;36m[debug]\033[00m $2" ;;
-          'false') echo -e "[debug] $2" ;;
+          'true')
+            echo -e "\033[01;36m[debug]\033[00m $2"
+            ;;
+          'false')
+            echo -e "[debug] $2"
+            ;;
         esac
       fi
       ;;
@@ -188,155 +218,293 @@ print_message 'debug' "environment cache               '$environment_cache'"
 
 ################################################################
 
-for argument in "${chosen_arguments[@]}"; do
-  case "$argument" in
-    -a=* | --arch=* | --architecture=* | --architectures=*)
-      declare -a chosen_architectures+=($(echo "${argument#*=}" | tr '[:upper:]' '[:lower:]' | tr ',' ' '))
-      ;;
-    -r=* | --release=* | --releases=*)
-      declare -a suites+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    -c=* | --comp=* | --component=* | --components=*)
-      declare -a components+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    -v=* | --variant=*)
-      declare chosen_variant="${argument#*=}"
-      ;;
-    -p=* | --package-set=*)
-      declare -a custom_package_set+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    -i=* | --include=*)
-      declare -a include_packages+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    -I=* | --install=*)
-      declare -a install_packages+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    -e=* | --exclude=*)
-      declare -a exclude_packages+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    -F=* | --forbid=*)
-      declare -a forbid_packages+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    -o=* | --output=*)
-      declare chosen_output_location="$(realpath --quiet "${argument#*=}")"
-      ;;
-    -f=* | --format=*)
-      declare chosen_output_format="${argument#*=}"
-      ;;
-    -C=* | --compression=*)
-      declare chosen_output_compression="${argument#*=}"
-      ;;
-    -R=* | --resolver=*)
-      declare chosen_resolver="${argument#*=}"
-      ;;
-    -D=* | --downloader=*)
-      declare chosen_downloader="${argument#*=}"
-      ;;
-    -E=* | --extractor=*)
-      declare chosen_extractor="${argument#*=}"
-      ;;
-    --extract-all)
-      declare packages_to_extract='all-packages'
-      ;;
-    --extract-essential)
-      declare packages_to_extract='essential-packages'
-      ;;
-    --include-essential=*)
-      declare -a include_essentials+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    --exclude-essential=*)
-      declare -a exclude_essentials+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    'ftp:/'* | 'http:/'* | 'https:/'*)
-      declare chosen_full_mirror_uri="$argument"
-      ;;
-      # see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
-    --merged-usr)
-      declare merged_usr_type='aliased-dirs'
-      ;;
-    --no-merged-usr)
-      declare merged_usr_type='none'
-      ;;
-    --include-recommends)
-      declare include_recommends='true'
-      ;;
-    --no-include-recommends)
-      declare include_recommends='false'
-      ;;
-    --interactive)
-      declare interactive_bootstrap='true'
-      ;;
-    --noninteractive)
-      declare interactive_bootstrap='false'
-      ;;
-    --force-only-bash)
-      declare -a force_configuration+=('only-bash')
-      ;;
-    --force-only-gawk)
-      declare -a force_configuration+=('only-gawk')
-      ;;
-    --force-only-mawk)
-      declare -a force_configuration+=('only-mawk')
-      ;;
-    --force-only-original-awk)
-      declare -a force_configuration+=('only-original-awk')
-      ;;
-    --environment-hook=*)
-      declare -a environment_hooks+=("${argument#*=}")
-      ;;
-    --download-hook=*)
-      declare -a download_hooks+=("${argument#*=}")
-      ;;
-    --extract-hook=*)
-      declare -a extract_hooks+=("${argument#*=}")
-      ;;
-    --essential-hook=*)
-      declare -a essential_hooks+=("${argument#*=}")
-      ;;
-    --target-hook=*)
-      declare -a target_hooks+=("${argument#*=}")
-      ;;
-    --only-print)
-      declare only_then_exit='print-packages'
-      ;;
-    --only-download)
-      declare only_then_exit='download-packages'
-      ;;
-    --only-extract)
-      declare only_then_exit='extract-packages'
-      ;;
-    --deb822-style)
-      declare sources_list_format='deb822-style'
-      ;;
-    --one-line-style)
-      declare sources_list_format='one-line-style'
-      ;;
-    --keep-packages)
-      declare keep_packages='true'
-      ;;
-    --keep-workspace)
-      declare keep_workspace='true'
-      ;;
-    --skip-architecture-check)
-      declare skip_architecture_check='true'
-      ;;
-    --discard-output)
-      declare discard_output='true'
-      ;;
-    -y | --yes | --assume-yes)
-      declare assume_user_input='assume-yes'
-      ;;
-    -n | --no | --assume-no)
-      declare assume_user_input='assume-no'
-      ;;
-    *)
-      print_message 'error' "unrecognized argument '$argument'"
-      exit 1
-      ;;
-  esac
+for argument in "${provided_arguments[@]}"; do
+  if [ -z "$value_of_next_argument" ]; then
+    case "$argument" in
+      -a=* | --arch=* | --architecture=* | --architectures=*)
+        declare -a chosen_architectures+=($(echo "${argument#*=}" | tr '[:upper:]' '[:lower:]' | tr ',' ' '))
+        ;;
+      -a | --arch | --architecture | --architectures)
+        declare value_of_next_argument='architectures'
+        ;;
+      -r=* | --release=* | --releases=*)
+        declare -a suites+=($(echo "${argument#*=}" | tr ',' ' '))
+        ;;
+      -r | --release | --releases)
+        declare value_of_next_argument='suites'
+        ;;
+      -c=* | --comp=* | --component=* | --components=*)
+        declare -a components+=($(echo "${argument#*=}" | tr ',' ' '))
+        ;;
+      -c | --comp | --component | --components)
+        declare value_of_next_argument='components'
+        ;;
+      -v=* | --variant=*)
+        declare chosen_variant="${argument#*=}"
+        ;;
+      -v | --variant)
+        declare value_of_next_argument='variant'
+        ;;
+      -p=* | --package-set=*)
+        declare -a custom_package_set+=($(echo "${argument#*=}" | tr ',' ' '))
+        ;;
+      -p | --package-set)
+        declare value_of_next_argument='custom-package-set'
+        ;;
+      -i=* | --include=*)
+        declare -a packages_to_include+=($(echo "${argument#*=}" | tr ',' ' '))
+        ;;
+      -i | --include)
+        declare value_of_next_argument='packages-to-include'
+        ;;
+      -I=* | --install=*)
+        declare -a packages_to_install+=($(echo "${argument#*=}" | tr ',' ' '))
+        ;;
+      -I | --install)
+        declare value_of_next_argument='packages-to-install'
+        ;;
+      -e=* | --exclude=*)
+        declare -a packages_to_exclude+=($(echo "${argument#*=}" | tr ',' ' '))
+        ;;
+      -e | --exclude)
+        declare value_of_next_argument='packages-to-exclude'
+        ;;
+      -F=* | --forbid=*)
+        declare -a packages_to_forbid+=($(echo "${argument#*=}" | tr ',' ' '))
+        ;;
+      -F | --forbid)
+        declare value_of_next_argument='packages-to-forbid'
+        ;;
+      -o=* | --output=*)
+        declare chosen_output_location="$(realpath --quiet "${argument#*=}")"
+        ;;
+      -o | --output)
+        declare value_of_next_argument='output-location'
+        ;;
+      -f=* | --format=*)
+        declare chosen_output_format="${argument#*=}"
+        ;;
+      -f | --format)
+        declare value_of_next_argument='output-format'
+        ;;
+      -C=* | --compression=*)
+        declare chosen_output_compression="${argument#*=}"
+        ;;
+      -C | --compression)
+        declare value_of_next_argument='output-compression'
+        ;;
+      -R=* | --resolver=*)
+        declare chosen_resolver="${argument#*=}"
+        ;;
+      -R | --resolver)
+        declare value_of_next_argument='resolver'
+        ;;
+      -D=* | --downloader=*)
+        declare chosen_downloader="${argument#*=}"
+        ;;
+      -D | --downloader)
+        declare value_of_next_argument='downloader'
+        ;;
+      -E=* | --extractor=*)
+        declare chosen_extractor="${argument#*=}"
+        ;;
+      -E | --extractor)
+        declare value_of_next_argument='extractor'
+        ;;
+      --extract-all)
+        declare packages_to_extract='all-packages'
+        ;;
+      --extract-essential)
+        declare packages_to_extract='essential-packages'
+        ;;
+      --include-essential=*)
+        declare -a include_essentials+=($(echo "${argument#*=}" | tr ',' ' '))
+        ;;
+      --include-essential)
+        declare value_of_next_argument='essential-packages-to-include'
+        ;;
+      --exclude-essential=*)
+        declare -a exclude_essentials+=($(echo "${argument#*=}" | tr ',' ' '))
+        ;;
+      --exclude-essential)
+        declare value_of_next_argument='essential-packages-to-exclude'
+        ;;
+      'ftp:/'* | 'http:/'* | 'https:/'*)
+        declare chosen_full_mirror_uri="$argument"
+        ;;
+        # see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
+      --merged-usr)
+        declare merged_usr_type='aliased-dirs'
+        ;;
+      --no-merged-usr)
+        declare merged_usr_type='none'
+        ;;
+      --include-recommends)
+        declare include_recommends='true'
+        ;;
+      --no-include-recommends)
+        declare include_recommends='false'
+        ;;
+      --interactive)
+        declare interactive_bootstrap='true'
+        ;;
+      --noninteractive)
+        declare interactive_bootstrap='false'
+        ;;
+      --force-only-bash)
+        declare -a force_configuration+=('only-bash')
+        ;;
+      --force-only-gawk)
+        declare -a force_configuration+=('only-gawk')
+        ;;
+      --force-only-mawk)
+        declare -a force_configuration+=('only-mawk')
+        ;;
+      --force-only-original-awk)
+        declare -a force_configuration+=('only-original-awk')
+        ;;
+      --environment-hook=*)
+        declare -a environment_hooks+=("${argument#*=}")
+        ;;
+      --environment-hook)
+        declare value_of_next_argument='environment-hooks'
+        ;;
+      --download-hook=*)
+        declare -a download_hooks+=("${argument#*=}")
+        ;;
+      --download-hook)
+        declare value_of_next_argument='download-hooks'
+        ;;
+      --extract-hook=*)
+        declare -a extract_hooks+=("${argument#*=}")
+        ;;
+      --extract-hook)
+        declare value_of_next_argument='extract-hooks'
+        ;;
+      --essential-hook=*)
+        declare -a essential_hooks+=("${argument#*=}")
+        ;;
+      --essential-hook)
+        declare value_of_next_argument='essential-hooks'
+        ;;
+      --target-hook=*)
+        declare -a target_hooks+=("${argument#*=}")
+        ;;
+      --target-hook)
+        declare value_of_next_argument='target-hooks'
+        ;;
+      --only-print)
+        declare only_then_exit='print-packages'
+        ;;
+      --only-download)
+        declare only_then_exit='download-packages'
+        ;;
+      --only-extract)
+        declare only_then_exit='extract-packages'
+        ;;
+      --deb822-style)
+        declare sources_list_format='deb822-style'
+        ;;
+      --one-line-style)
+        declare sources_list_format='one-line-style'
+        ;;
+      --keep-packages)
+        declare keep_packages='true'
+        ;;
+      --keep-workspace)
+        declare keep_workspace='true'
+        ;;
+      --skip-architecture-check)
+        declare skip_architecture_check='true'
+        ;;
+      --discard-output)
+        declare discard_output='true'
+        ;;
+      -y | --yes | --assume-yes)
+        declare assume_user_input='assume-yes'
+        ;;
+      -n | --no | --assume-no)
+        declare assume_user_input='assume-no'
+        ;;
+      *)
+        print_message 'error' "unrecognized argument '$argument'"
+        exit 1
+        ;;
+    esac
+  else
+    case "$value_of_next_argument" in
+      architectures)
+        declare -a chosen_architectures+=($(echo "$argument" | tr '[:upper:]' '[:lower:]' | tr ',' ' '))
+        ;;
+      suites)
+        declare -a suites+=($(echo "$argument" | tr ',' ' '))
+        ;;
+      components)
+        declare -a components+=($(echo "$argument" | tr ',' ' '))
+        ;;
+      variant)
+        declare chosen_variant="$argument"
+        ;;
+      custom-package-set)
+        declare -a custom_package_set+=($(echo "$argument" | tr ',' ' '))
+        ;;
+      packages-to-include)
+        declare -a packages_to_include+=($(echo "$argument" | tr ',' ' '))
+        ;;
+      packages-to-install)
+        declare -a packages_to_install+=($(echo "$argument" | tr ',' ' '))
+        ;;
+      packages-to-exclude)
+        declare -a packages_to_exclude+=($(echo "$argument" | tr ',' ' '))
+        ;;
+      packages-to-forbid)
+        declare -a packages_to_forbid+=($(echo "$argument" | tr ',' ' '))
+        ;;
+      output-location)
+        declare chosen_output_location="$(realpath --quiet "$argument")"
+        ;;
+      output-format)
+        declare chosen_output_format="$argument"
+        ;;
+      output-compression)
+        declare chosen_output_compression="$argument"
+        ;;
+      resolver)
+        declare chosen_resolver="$argument"
+        ;;
+      downloader)
+        declare chosen_downloader="$argument"
+        ;;
+      extractor)
+        declare chosen_extractor="$argument"
+        ;;
+      essential-packages-to-include)
+        declare -a include_essentials+=($(echo "$argument" | tr ',' ' '))
+        ;;
+      essential-packages-to-exclude)
+        declare -a exclude_essentials+=($(echo "$argument" | tr ',' ' '))
+        ;;
+      environment-hooks)
+        declare -a environment_hooks+=("$argument")
+        ;;
+      download-hooks)
+        declare -a download_hooks+=("$argument")
+        ;;
+      extract-hooks)
+        declare -a extract_hooks+=("$argument")
+        ;;
+      essential-hooks)
+        declare -a essential_hooks+=("$argument")
+        ;;
+      target-hooks)
+        declare -a target_hooks+=("$argument")
+        ;;
+    esac
+    unset value_of_next_argument
+  fi
 done
 
-unset chosen_arguments
+unset provided_arguments
 
 ################################################################
 
@@ -613,18 +781,18 @@ elif [ "${#custom_package_set[@]}" != '0' ]; then
 fi
 
 for package in $(suite_specific_extras "$variant" "${suites[0]}"); do
-  declare -a include_packages+=("$package")
+  declare -a packages_to_include+=("$package")
 done
 
 print_message 'debug' "# of custom package set         '${#custom_package_set[@]}'"
 
-print_message 'debug' "# of packages to include        '${#include_packages[@]}'"
+print_message 'debug' "# of packages to include        '${#packages_to_include[@]}'"
 
-print_message 'debug' "# of packages to install        '${#install_packages[@]}'"
+print_message 'debug' "# of packages to install        '${#packages_to_install[@]}'"
 
-print_message 'debug' "# of packages to exclude        '${#exclude_packages[@]}'"
+print_message 'debug' "# of packages to exclude        '${#packages_to_exclude[@]}'"
 
-print_message 'debug' "# of packages to forbid         '${#forbid_packages[@]}'"
+print_message 'debug' "# of packages to forbid         '${#packages_to_forbid[@]}'"
 
 ################################################################
 
@@ -955,10 +1123,10 @@ fi
 
 case "$merged_usr_type" in
   aliased-dirs)
-    print_message 'warning' 'merged-usr-via-aliased-dirs might not be supported by dpkg.'
+    print_message 'warning' '"merged-usr-via-aliased-dirs" might not be supported by dpkg.'
     ;;
   none)
-    declare -a forbid_packages+=('usrmerge')
+    declare -a packages_to_forbid+=('usrmerge')
     ;;
 esac
 
@@ -1006,23 +1174,23 @@ if [ "${#force_configuration[@]}" != '0' ]; then
   for configuration in "${force_configuration[@]}"; do
     case "$configuration" in
       only-bash)
-        declare -a include_packages+=('bash')
-        declare -a forbid_packages+=('dash')
+        declare -a packages_to_include+=('bash')
+        declare -a packages_to_forbid+=('dash')
         ;;
       only-gawk)
         let awk_counter+='1'
-        declare -a include_packages+=('gawk')
-        declare -a forbid_packages+=('mawk' 'original-awk')
+        declare -a packages_to_include+=('gawk')
+        declare -a packages_to_forbid+=('mawk' 'original-awk')
         ;;
       only-mawk)
         let awk_counter+='1'
-        declare -a include_packages+=('mawk')
-        declare -a forbid_packages+=('gawk' 'original-awk')
+        declare -a packages_to_include+=('mawk')
+        declare -a packages_to_forbid+=('gawk' 'original-awk')
         ;;
       only-original-awk)
         let awk_counter+='1'
-        declare -a include_packages+=('original-awk')
-        declare -a forbid_packages+=('gawk' 'mawk')
+        declare -a packages_to_include+=('original-awk')
+        declare -a packages_to_forbid+=('gawk' 'mawk')
         ;;
     esac
   done
@@ -1131,9 +1299,9 @@ silica-strap \
     ubuntu-keyring
     util-linux
   ' \
-  --assume-yes \
-  --alternate-screen
-" # $(case "$assume_user_input" in assume-yes) echo '--assume-yes' ;; assume-no) echo '--assume-no' ;; esac)
+  --alternate-screen \
+  $(case "$assume_user_input" in assume-yes) echo '--assume-yes' ;; assume-no) echo '--assume-no' ;; esac)
+"
     declare exit_status="$?"
     if [ -f "$environment_cache" ]; then
       echo 'Done.'
@@ -1319,9 +1487,9 @@ unset custom_package_set
 
 ################################################################
 
-if [ "${#include_packages[@]}" != '0' ]; then
-  declare -a include_packages=($(echo "${include_packages[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-  for included in "${include_packages[@]}"; do
+if [ "${#packages_to_include[@]}" != '0' ]; then
+  declare -a packages_to_include=($(echo "${packages_to_include[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
+  for included in "${packages_to_include[@]}"; do
     for package in "${initial_package_set[@]}"; do
       if [ "$included" = "$package" ]; then
         declare package_is_present='true'
@@ -1337,14 +1505,14 @@ if [ "${#include_packages[@]}" != '0' ]; then
   declare -a initial_package_set=($(echo "${initial_package_set[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
 fi
 
-if [ "${#forbid_packages[@]}" != '0' ]; then
-  declare -a forbid_packages=($(echo "${forbid_packages[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-  declare -a exclude_packages+=(${forbid_packages[@]})
+if [ "${#packages_to_forbid[@]}" != '0' ]; then
+  declare -a packages_to_forbid=($(echo "${packages_to_forbid[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
+  declare -a packages_to_exclude+=(${packages_to_forbid[@]})
 fi
 
-if [ "${#exclude_packages[@]}" != '0' ]; then
-  declare -a exclude_packages=($(echo "${exclude_packages[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-  for excluded in "${exclude_packages[@]}"; do
+if [ "${#packages_to_exclude[@]}" != '0' ]; then
+  declare -a packages_to_exclude=($(echo "${packages_to_exclude[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
+  for excluded in "${packages_to_exclude[@]}"; do
     for key in "${!initial_package_set[@]}"; do
       if [ "$excluded" = "${initial_package_set[key]}" ]; then
         declare package_is_present='true'
@@ -1372,10 +1540,10 @@ fi
 
 case "$resolver" in
   'apt')
-    if [ "${#forbid_packages[@]}" != '0' ]; then
+    if [ "${#packages_to_forbid[@]}" != '0' ]; then
       print_message 'debug' "creating temporary file '$environment/etc/apt/preferences.d/99silica-strap'"
       let counter='0'
-      for package in "${forbid_packages[@]}"; do
+      for package in "${packages_to_forbid[@]}"; do
         let counter+='1'
         if [ "$counter" != '1' ]; then
           echo '' >> "$environment/etc/apt/preferences.d/99silica-strap"
@@ -1407,7 +1575,7 @@ apt-get \
   install $(echo "${initial_package_set[@]}")
 " 2> /dev/stdout
     )"
-    if [ "${#forbid_packages[@]}" != '0' ]; then
+    if [ "${#packages_to_forbid[@]}" != '0' ]; then
       print_message 'debug' "removing temporary file '$environment/etc/apt/preferences.d/99silica-strap'"
       rm "$environment/etc/apt/preferences.d/99silica-strap"
     fi
@@ -1431,7 +1599,7 @@ apt-get \
           print_message 'debug' "package ignored '${input_packages[key]}'"
           unset input_packages[key]
         else
-          for package in "${forbid_packages[@]}"; do
+          for package in "${packages_to_forbid[@]}"; do
             if [ "$package" = "${input_packages[key]}" ]; then
               print_message 'debug' "package ignored '${input_packages[key]}'"
               unset input_packages[key]
@@ -1690,7 +1858,7 @@ if [ "$only_then_exit" = 'download-packages' ]; then
       mv "$downloaded_packages/"*.deb "$output_directory"
       ;;
     tarball)
-      echo 'Creating tarball (this might take a while) ...'
+      echo 'Creating tarball ...'
       pushd "$downloaded_packages" > /dev/null
       print_message 'debug' "creating tarball '$workspace/$output_file_name.tar'"
       tar --create --file="$workspace/$output_file_name.tar" *.deb
@@ -1875,7 +2043,7 @@ case "$packages_to_extract" in
         if [ -z "$(cat "$workspace/current-package-fields" | grep --regexp="^Package: ${initial_essential_subset[key]}$")" ]; then
           unset initial_essential_subset[key]
         else
-          for package in "${forbid_packages[@]}"; do
+          for package in "${packages_to_forbid[@]}"; do
             if [ "$package" = "${initial_essential_subset[key]}" ]; then
               print_message 'debug' "essential ignored '${initial_essential_subset[key]}'"
               unset initial_essential_subset[key]
@@ -2115,7 +2283,7 @@ if [ "$only_then_exit" = 'extract-packages' ]; then
   fi
   case "$output_format" in
     tarball)
-      echo 'Creating tarball (this might take a while) ...'
+      echo 'Creating tarball ...'
       pushd "$target" > /dev/null
       print_message 'debug' "creating tarball '$workspace/$output_file_name.tar'"
       tar --create --file="$workspace/$output_file_name.tar" *
@@ -2252,9 +2420,9 @@ fi
 
 ################################################################
 
-if [ "${#install_packages[@]}" != '0' ]; then
+if [ "${#packages_to_install[@]}" != '0' ]; then
   print_message 'debug' 'downloading and installing chosen packages.'
-  declare -a install_packages=($(echo "${install_packages[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
+  declare -a packages_to_install=($(echo "${packages_to_install[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
   chroot "$target" /usr/bin/env --ignore-environment bash -c "
 export HOME='/root'
 export TERM='$term_env_var'
@@ -2272,7 +2440,7 @@ apt-get \
   --option APT::Get::Assume-Yes='$apt_assume_yes' \
   --option APT::Install-Recommends='false' \
   --option APT::Install-Suggests='false' \
-  install $(echo "${install_packages[@]}")
+  install $(echo "${packages_to_install[@]}")
 "
 fi
 
@@ -2335,7 +2503,7 @@ fi
 
 case "$output_format" in
   tarball)
-    echo 'Creating tarball (this might take a while) ...'
+    echo 'Creating tarball ...'
     pushd "$target" > /dev/null
     print_message 'debug' "creating tarball '$workspace/$output_file_name.tar'"
     tar --create --file="$workspace/$output_file_name.tar" *
