@@ -1036,7 +1036,7 @@ fi
 
 if [ -z "$chosen_extractor" ]; then
   if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ]; then
-    declare chosen_extractor='env-dpkg-deb'
+    declare chosen_extractor='internal-dpkg-deb'
   elif command -v dpkg-deb &> /dev/null; then
     declare chosen_extractor='host-dpkg-deb'
   else
@@ -1048,11 +1048,11 @@ case "$chosen_extractor" in
   'ar')
     declare extractor='ar'
     ;;
-  env-dpkg-deb)
-    declare extractor='env-dpkg-deb'
-    ;;
   host-dpkg-deb | 'dpkg-deb')
     declare extractor='host-dpkg-deb'
+    ;;
+  internal-dpkg-deb)
+    declare extractor='internal-dpkg-deb'
     ;;
   *)
     print_message 'error' "unrecognized extractor '$chosen_extractor'"
@@ -1230,7 +1230,7 @@ if [ "$discard_output" = 'true' ]; then
   mkdir "$output_directory"
 fi
 
-if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ] || [ "$extractor" = 'env-dpkg-deb' ]; then
+if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ] || [ "$extractor" = 'internal-dpkg-deb' ]; then
   if [ ! -f "$environment_cache" ]; then
     echo -n 'No environment cache was found, do you want to create one? [Y/n] '
     if [ -z "$assume_user_input" ]; then
@@ -1746,7 +1746,7 @@ unset yes_or_no
 
 ################################################################################################################################
 
-if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ] || [ "$extractor" = 'env-dpkg-deb' ]; then
+if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ] || [ "$extractor" = 'internal-dpkg-deb' ]; then
   mount_virtual_kernel_file_systems "$environment" || exit 1
 fi
 
@@ -1754,7 +1754,7 @@ case "$extractor" in
   'ar' | host-dpkg-deb)
     declare all_packages="$workspace/packages"
     ;;
-  env-dpkg-deb)
+  internal-dpkg-deb)
     declare all_packages="$environment/packages"
     ;;
 esac
@@ -2133,7 +2133,7 @@ done
 
 ################################################################
 
-if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ] || [ "$extractor" = 'env-dpkg-deb' ]; then
+if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ] || [ "$extractor" = 'internal-dpkg-deb' ]; then
   unmount_virtual_kernel_file_systems "$environment" || exit 1
 fi
 

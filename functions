@@ -180,8 +180,10 @@ function extract_deb_field {
         control.tar.zst) zstd --decompress --stdout --force ;;
       esac | tar --extract ./control --to-stdout
       ;;
-    host-dpkg-deb) dpkg-deb --field "$1" ;;
-    env-dpkg-deb)
+    host-dpkg-deb)
+      dpkg-deb --field "$1"
+      ;;
+    internal-dpkg-deb)
       chroot "$environment" /usr/bin/env --ignore-environment bash -c "
 export HOME='/root'
 export TERM='$term_env_var'
@@ -205,8 +207,10 @@ function extract_deb_data {
         data.tar.zst) zstd --decompress --stdout --force ;;
       esac
       ;;
-    host-dpkg-deb) dpkg-deb --fsys-tarfile "$1" ;;
-    env-dpkg-deb)
+    host-dpkg-deb)
+      dpkg-deb --fsys-tarfile "$1"
+      ;;
+    internal-dpkg-deb)
       chroot "$environment" /usr/bin/env --ignore-environment bash -c "
 export HOME='/root'
 export TERM='$term_env_var'
