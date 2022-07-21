@@ -3,7 +3,7 @@
 shopt -s extglob
 
 if [ -z "$1" ];
-  then declare print_usage_then_exit='true';
+  then declare print_usage_then_exit='true'
 fi
 
 declare version='0.0.1'
@@ -11,7 +11,7 @@ declare version='0.0.1'
 declare workspace="/tmp/silica-strap_$(cat /dev/urandom | tr --delete --complement '[:alnum:]' | head --bytes=8)"
 
 for argument in "$@"; do
-  declare -a provided_arguments+=("$argument");
+  declare -a provided_arguments+=("$argument")
 done
 
 for key in "${!provided_arguments[@]}"; do
@@ -108,20 +108,24 @@ function print_message {
     error)
       case "$colorful_output" in
         'true')
-          echo -e "\033[01;31merror\033[00m: $2"
+          echo -e -n "\033[01;31merror\033[00m: "
+          echo "$2"
           ;;
         'false')
-          echo -e "error: $2"
+          echo -n "error: "
+          echo "$2"
           ;;
       esac > /dev/stderr
       ;;
     warning)
       case "$colorful_output" in
         'true')
-          echo -e "\033[01;33mwarning\033[00m: $2"
+          echo -e -n "\033[01;33mwarning\033[00m: "
+          echo "$2"
           ;;
         'false')
-          echo -e "warning: $2"
+          echo -n "warning: "
+          echo "$2"
           ;;
       esac > /dev/stderr
       ;;
@@ -129,10 +133,12 @@ function print_message {
       if [ "$debug_output" = 'true' ]; then
         case "$colorful_output" in
           'true')
-            echo -e "\033[01;36m[debug]\033[00m $2"
+            echo -e -n "\033[01;36m[debug]\033[00m "
+            echo "$2"
             ;;
           'false')
-            echo -e "[debug] $2"
+            echo -n "[debug] "
+            echo "$2"
             ;;
         esac
       fi
@@ -329,8 +335,8 @@ for argument in "${provided_arguments[@]}"; do
       --exclude-essential)
         declare value_of_next_argument='essential-packages-to-exclude'
         ;;
-      'ftp:/'* | 'http:/'* | 'https:/'*)
-        declare chosen_full_mirror_uri="$argument"
+      'ftp://'* | 'http://'* | 'https://'*)
+        declare -a chosen_mirrors+=("$argument")
         ;;
         # see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
       --merged-usr)
@@ -1077,41 +1083,21 @@ print_message 'debug' "packages to extract             '$packages_to_extract'"
 
 ################################################################
 
-if [ -z "$chosen_full_mirror_uri" ]; then
-  declare chosen_full_mirror_uri="$(default_full_mirror_uri "${suites[0]}" "${architectures[0]}")"
+if [ "${#chosen_mirrors[@]}" = '0' ]; then
+  for uri in $(default_mirrors "${suites[0]}" "${architectures[0]}"); do
+    declare -a chosen_mirrors+=("$uri")
+  done
 fi
 
-declare chosen_uri_scheme="$(echo "$chosen_full_mirror_uri" | sed --expression 's/:\/.*//')"
+for uri in "${chosen_mirrors[@]}"; do
+  declare -a mirrors+=("$(echo "$uri" | tr --squeeze-repeats '\/' | sed --expression 's/:\//:\/\//' | sed --expression 's/\/$//')")
+done
 
-declare chosen_mirror="$(echo "$chosen_full_mirror_uri" | sed --expression 's/.*:\///')"
+unset chosen_mirrors
 
-unset chosen_full_mirror_uri
-
-case "$chosen_uri_scheme" in
-  'ftp')
-    declare uri_scheme='ftp'
-    ;;
-  http)
-    declare uri_scheme='http'
-    ;;
-  https)
-    declare uri_scheme='https'
-    ;;
-  *)
-    print_message 'error' "unrecognized URI scheme '$chosen_uri_scheme'"
-    exit 1
-    ;;
-esac
-
-unset chosen_uri_scheme
-
-declare mirror="$(echo "$chosen_mirror" | tr --squeeze-repeats '\/' | sed --expression 's/^\/*//' | sed --expression 's/\/$//')"
-
-unset chosen_mirror
+print_message 'debug' "mirror(s)                       $(for uri in "${mirrors[@]}"; do echo -n "'$uri'"; done | sed --expression "s/''/' '/g")"
 
 # TODO add a test for the chosen mirror and if it fails then fallback to the default mirror.
-
-print_message 'debug' "full mirror                     '$uri_scheme://$mirror'"
 
 ################################################################
 
@@ -1214,6 +1200,12 @@ print_message 'debug' "# of extract hooks              '${#extract_hooks[@]}'"
 print_message 'debug' "# of essential hooks            '${#essential_hooks[@]}'"
 
 print_message 'debug' "# of target hooks               '${#target_hooks[@]}'"
+
+################################################################
+
+if [ "$only_then_exit" = 'print-packages' ]; then
+  declare discard_output='true'
+fi
 
 ################################################################################################################################
 
@@ -1371,7 +1363,7 @@ apt_config
 # See sources.list(5) for more info on deb822 style sources.
 
 Types: deb
-URIs: $uri_scheme://$mirror
+URIs: ${mirrors[@]}
 Suites: ${suites[@]}
 Components: ${components[@]}
 Architectures: ${architectures[@]}
@@ -1385,11 +1377,9 @@ fi
 ################################################################
 
 for command in "${environment_hooks[@]}"; do
-  print_message 'debug' 'running hook {'
-  if [ "$debug_output" = 'true' ]; then
-    echo "$command"
-    echo '}'
-  fi
+  print_message 'debug' "running hook {
+$command
+}"
   /usr/bin/env bash -c "
 export CHROOT_DIRECTORY='$environment'
 
@@ -1422,17 +1412,15 @@ apt-get \
     exit 1
   fi
   declare primary_package_list_file="$environment/var/lib/apt/lists/$(
-    echo "$mirror" |
-      sed --expression 's/\/.*//'
-  )_$(
-    echo "$mirror" |
-      sed --expression 's/.*\///'
+    echo "${mirrors[0]}" |
+      sed --expression 's/.*:\/\///' |
+      tr '\/' '_'
   )_dists_${suites[0]}_${components[0]}_binary-${architectures[0]}_Packages"
   print_message 'debug' "copying '$primary_package_list_file' to '$workspace/primary_package_list'"
   cp "$primary_package_list_file" "$workspace/primary_package_list"
   unset primary_package_list_file
 else
-  fetch_package_list "$uri_scheme" "$mirror" "${suites[0]}" "${components[0]}" "${architectures[0]}" || exit 1
+  fetch_package_list "${mirrors[0]}" "${suites[0]}" "${components[0]}" "${architectures[0]}" || exit 1
   print_message 'debug' "renaming '$workspace/Packages' to '$workspace/primary_package_list'"
   mv "$workspace/Packages" "$workspace/primary_package_list"
 fi
@@ -1457,20 +1445,24 @@ case "$variant" in
             echo 'Package: mawk'
             ;;
           required)
+            awk '/\nEssential: yes\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             awk '/\nPriority: required\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             echo 'Package: apt'
             ;;
           buildd)
+            awk '/\nEssential: yes\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             awk '/\nPriority: required\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             awk '/\nBuild-Essential: yes\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             echo 'Package: apt'
             echo 'Package: build-essential'
             ;;
           important)
+            awk '/\nEssential: yes\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             awk '/\nPriority: required\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             awk '/\nPriority: important\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             ;;
           standard)
+            awk '/\nEssential: yes\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             awk '/\nPriority: required\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             awk '/\nPriority: important\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
             awk '/\nPriority: standard\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
@@ -1806,14 +1798,14 @@ else
       print_message 'error' "failed to find '$package'"
       exit 1
     fi
-    print_message 'debug' "downloading '$uri_scheme://$mirror/$package_path'"
+    print_message 'debug' "downloading '${mirrors[0]}/$package_path'"
     case "$downloader" in
       'curl')
         echo "Downloading $(basename "$package_path") ..."
-        curl --silent --remote-name "$uri_scheme://$mirror/$package_path"
+        curl --silent --remote-name "${mirrors[0]}/$package_path"
         ;;
       'wget')
-        wget --quiet --show-progress "$uri_scheme://$mirror/$package_path"
+        wget --quiet --show-progress "${mirrors[0]}/$package_path"
         ;;
     esac
     if [ "$?" != '0' ]; then
@@ -1829,11 +1821,9 @@ fi
 ################################################################
 
 for command in "${download_hooks[@]}"; do
-  print_message 'debug' 'running hook {'
-  if [ "$debug_output" = 'true' ]; then
-    echo "$command"
-    echo '}'
-  fi
+  print_message 'debug' "running hook {
+$command
+}"
   /usr/bin/env bash -c "
 export CHROOT_DIRECTORY='$environment'
 
@@ -2234,7 +2224,7 @@ case "$sources_list_format" in
     print_message 'debug' "creating a deb822-style sources list '$target/etc/apt/sources.list.d/sources.sources'"
     cat << sources > "$target/etc/apt/sources.list.d/sources.sources"
 Types: deb
-URIs: $uri_scheme://$mirror
+URIs: ${mirrors[@]}
 Suites: ${suites[@]}
 Components: ${components[@]}
 sources
@@ -2242,14 +2232,16 @@ sources
   one-line-style)
     print_message 'debug' "creating a one-line-style sources list '$target/etc/apt/sources.list'"
     let counter='0'
-    for suite in "${suites[@]}"; do
-      let counter+='1'
-      if [ "$counter" != '1' ]; then
-        echo '' >> "$target/etc/apt/sources.list"
-      fi
-      echo "deb $uri_scheme://$mirror $suite ${components[@]}" >> "$target/etc/apt/sources.list"
+    for mirror in "${mirrors[@]}"; do
+      for suite in "${suites[@]}"; do
+        let counter+='1'
+        if [ "$counter" != '1' ]; then
+          echo '' >> "$target/etc/apt/sources.list"
+        fi
+        echo "deb $mirrors $suite ${components[@]}" >> "$target/etc/apt/sources.list"
+      done
+      unset counter
     done
-    unset counter
     ;;
 esac
 
@@ -2258,11 +2250,9 @@ unset sources_list_format
 ################################################################
 
 for command in "${extract_hooks[@]}"; do
-  print_message 'debug' 'running hook {'
-  if [ "$debug_output" = 'true' ]; then
-    echo "$command"
-    echo '}'
-  fi
+  print_message 'debug' "running hook {
+$command
+}"
   /usr/bin/env bash -c "
 export CHROOT_DIRECTORY='$target'
 
@@ -2378,11 +2368,9 @@ fi
 ################################################################
 
 for command in "${essential_hooks[@]}"; do
-  print_message 'debug' 'running hook {'
-  if [ "$debug_output" = 'true' ]; then
-    echo "$command"
-    echo '}'
-  fi
+  print_message 'debug' "running hook {
+$command
+}"
   /usr/bin/env bash -c "
 export CHROOT_DIRECTORY='$target'
 
@@ -2420,6 +2408,24 @@ fi
 
 ################################################################
 
+for command in "${target_hooks[@]}"; do
+  print_message 'debug' "running hook {
+$command
+}"
+  /usr/bin/env bash -c "
+export CHROOT_DIRECTORY='$target'
+
+cd '$workspace'
+
+$command
+"
+  if [ "$?" != '0' ]; then
+    print_message 'warning' 'hook returned an error.'
+  fi
+done
+
+################################################################
+
 if [ "${#packages_to_install[@]}" != '0' ]; then
   print_message 'debug' 'downloading and installing chosen packages.'
   declare -a packages_to_install=($(echo "${packages_to_install[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
@@ -2443,26 +2449,6 @@ apt-get \
   install $(echo "${packages_to_install[@]}")
 "
 fi
-
-################################################################
-
-for command in "${target_hooks[@]}"; do
-  print_message 'debug' 'running hook {'
-  if [ "$debug_output" = 'true' ]; then
-    echo "$command"
-    echo '}'
-  fi
-  /usr/bin/env bash -c "
-export CHROOT_DIRECTORY='$target'
-
-cd '$workspace'
-
-$command
-"
-  if [ "$?" != '0' ]; then
-    print_message 'warning' 'hook returned an error.'
-  fi
-done
 
 ################################################################
 
