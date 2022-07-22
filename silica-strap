@@ -6,7 +6,7 @@ if [ -z "$1" ];
   then declare print_usage_then_exit='true'
 fi
 
-declare version='1.0'
+declare version='0.1'
 
 declare workspace="/tmp/silica-strap_$(cat /dev/urandom | tr --delete --complement '[:alnum:]' | head --bytes=8)"
 
