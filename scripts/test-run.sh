@@ -41,19 +41,13 @@ declare -a my_components+=('main')
 
 #declare my_variant='essential'
 #declare my_variant='apt-essential'
-#declare my_variant='required'
+declare my_variant='required'
 #declare my_variant='buildd'
 #declare my_variant='important'
-declare my_variant='standard'
+#declare my_variant='standard'
 
 declare my_format='directory'
 #declare my_format='tarball'
-
-declare my_compression='none'
-#declare my_compression='bzip2'
-#declare my_compression='gzip'
-#declare my_compression='xz'
-#declare my_compression='zstd'
 
 declare my_resolver='apt'
 #declare my_resolver='internal'
@@ -69,22 +63,20 @@ declare my_extractor='ar'
 
 silica-strap \
   --discard-output \
-  --architectures="$(echo "${my_architectures[@]}")" \
-  --releases="$(echo "${my_suites[@]}")" \
-  --components="$(echo "${my_components[@]}")" \
-  --variant="$my_variant" \
-  --format="$my_format" \
-  --compression="$my_compression" \
-  --resolver="$my_resolver" \
-  --downloader="$my_downloader" \
-  --extractor="$my_extractor" \
-  $(echo "$@")
+  --architectures "$(echo "${my_architectures[@]}")" \
+  --releases "$(echo "${my_suites[@]}")" \
+  --components "$(echo "${my_components[@]}")" \
+  --variant "$my_variant" \
+  --format "$my_format" \
+  --resolver "$my_resolver" \
+  --downloader "$my_downloader" \
+  --extractor "$my_extractor" \
+  $(echo "$@") \
+#  --environment-hook="nano \"\$CHROOT_DIRECTORY/etc/apt/sources.list.d/sources.sources\"" \
+#  --target-hook="chroot \"\$CHROOT_DIRECTORY\" /usr/bin/env --ignore-environment bash -c \"export HOME='/root'; export TERM='$TERM'; bash --login\""
 
 if [ "$?" = '0' ]; then
   exit 0
 else
   exit 1
 fi
-
-#  --environment-hook="nano \"\$CHROOT_DIRECTORY/etc/apt/sources.list.d/sources.sources\"" \
-#  --target-hook="chroot \"\$CHROOT_DIRECTORY\" /usr/bin/env --ignore-environment bash -c \"export HOME='/root'; export TERM='$TERM'; bash --login\"" \

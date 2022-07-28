@@ -94,8 +94,8 @@ function clean_up {
         exit 1
       fi
     fi
-    if [ "$keep_workspace" = 'true' ]; then
-      print_message 'debug' "not removing directory '$workspace'"
+    if [ "$keep_workspace_directory" = 'true' ]; then
+      print_message 'warning' "as requested, not removing workspace '$workspace'"
     else
       print_message 'debug' "removing temporary directory '$workspace'"
       rm --recursive "$workspace"
@@ -141,6 +141,8 @@ function fetch_package_list {
   fi
 }
 
+<< '#block_comment'
+
 function compress_and_move_output_file {
   echo 'Compressing ...'
   print_message 'debug' "compressing '$1' with '$output_compression'"
@@ -167,6 +169,8 @@ function compress_and_move_output_file {
       ;;
   esac
 }
+
+#block_comment
 
 function extract_deb_field {
   case "$extractor" in

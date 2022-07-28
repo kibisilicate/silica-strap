@@ -59,17 +59,17 @@ if [ -z "$chosen_colorful_output" ]; then
   if [ -n "$SILICA_STRAP_COLOR" ]; then
     declare chosen_colorful_output="$SILICA_STRAP_COLOR"
   elif [ -n "$NO_COLOR" ]; then
-    declare chosen_colorful_output='false'
+    declare chosen_colorful_output='always'
   else
     declare chosen_colorful_output='auto'
   fi
 fi
 
 case "$chosen_colorful_output" in
-  'true' | always)
+  always)
     declare colorful_output='true'
     ;;
-  'false' | never)
+  never)
     declare colorful_output='false'
     ;;
   auto)
@@ -293,12 +293,6 @@ for argument in "${provided_arguments[@]}"; do
       -f | --format)
         declare value_of_next_argument='output-format'
         ;;
-      -C=* | --compression=*)
-        declare chosen_output_compression="${argument#*=}"
-        ;;
-      -C | --compression)
-        declare value_of_next_argument='output-compression'
-        ;;
       -R=* | --resolver=*)
         declare chosen_resolver="${argument#*=}"
         ;;
@@ -354,7 +348,7 @@ for argument in "${provided_arguments[@]}"; do
       --interactive)
         declare interactive_bootstrap='true'
         ;;
-      --noninteractive)
+      --non-interactive)
         declare interactive_bootstrap='false'
         ;;
       --force-only-bash)
@@ -415,10 +409,10 @@ for argument in "${provided_arguments[@]}"; do
         declare sources_list_format='one-line-style'
         ;;
       --keep-packages)
-        declare keep_packages='true'
+        declare keep_packages_directory='true'
         ;;
       --keep-workspace)
-        declare keep_workspace='true'
+        declare keep_workspace_directory='true'
         ;;
       --skip-architecture-check)
         declare skip_architecture_check='true'
@@ -471,9 +465,6 @@ for argument in "${provided_arguments[@]}"; do
         ;;
       output-format)
         declare chosen_output_format="$argument"
-        ;;
-      output-compression)
-        declare chosen_output_compression="$argument"
         ;;
       resolver)
         declare chosen_resolver="$argument"
@@ -802,6 +793,10 @@ print_message 'debug' "# of packages to forbid         '${#packages_to_forbid[@]
 
 ################################################################
 
+if [ "$only_then_exit" = 'print-packages' ]; then
+  declare discard_output='true'
+fi
+
 if [ "$discard_output" = 'true' ]; then
   print_message 'debug' 'ignoring any provided output location.'
   declare implied_format='directory'
@@ -822,23 +817,6 @@ else
   fi
   unset chosen_output_directory
   declare chosen_output_file_name="$(basename "$chosen_output_location")"
-  case "$chosen_output_file_name" in
-    *'.bz2')
-      declare implied_compression='bzip2'
-      ;;
-    *'.gz')
-      declare implied_compression='gzip'
-      ;;
-    *'.xz')
-      declare implied_compression='xz'
-      ;;
-    *'.zst')
-      declare implied_compression='zstd'
-      ;;
-  esac
-  if [ -n "$implied_compression" ]; then
-    declare chosen_output_file_name="${chosen_output_file_name%.*}"
-  fi
   case "$chosen_output_file_name" in
     *'.tar')
       declare implied_format='tarball'
@@ -909,58 +887,6 @@ case "$output_format" in
 esac
 
 unset chosen_output_file_name
-
-################################################################
-
-case "$output_format" in
-  tarball)
-    if [ -z "$chosen_output_compression" ]; then
-      if [ -z "$implied_compression" ]; then
-        declare chosen_output_compression='none'
-      else
-        declare chosen_output_compression="$implied_compression"
-      fi
-    fi
-    case "$chosen_output_compression" in
-      none)
-        declare output_compression='none'
-        ;;
-      'bzip2' | 'bz2')
-        declare output_compression='bzip2'
-        ;;
-      'gzip' | 'gz')
-        declare output_compression='gzip'
-        ;;
-      'xz')
-        declare output_compression='xz'
-        ;;
-      'zstd' | 'zst')
-        declare output_compression='zstd'
-        ;;
-      *)
-        print_message 'error' "unrecognized compression format '$chosen_output_compression'"
-        exit 1
-        ;;
-    esac
-    print_message 'debug' "output compression              '$output_compression'"
-    if [ -n "$implied_compression" ] && [ "$implied_compression" != 'none' ]; then
-      if [ "$output_compression" != "$implied_compression" ]; then
-        print_message 'error' "compression '$output_compression' was chosen but output file implied '$implied_compression'"
-        exit 1
-      fi
-    fi
-    ;;
-  *)
-    if [ -n "$chosen_output_compression" ] && [ "$chosen_output_compression" != 'none' ]; then
-      print_message 'error' "compression is only available for the variant 'tarball'"
-      exit 1
-    fi
-    ;;
-esac
-
-unset chosen_output_compression
-
-unset implied_compression
 
 ################################################################
 
@@ -1134,10 +1060,21 @@ fi
 ################################################################
 
 if [ -z "$interactive_bootstrap" ]; then
-  declare interactive_bootstrap='false'
+  if [ "$assume_user_input" = 'assume-yes' ]; then
+    declare interactive_bootstrap='false'
+  elif [ -t 1 ]; then
+    declare interactive_bootstrap='true'
+  else
+    declare interactive_bootstrap='false'
+  fi
 fi
 
 print_message 'debug' "interactive bootstrap           '$interactive_bootstrap'"
+
+if [ "$assume_user_input" = 'assume-yes' ] && [ "$interactive_bootstrap" = 'true' ]; then
+  print_message 'error' '--assume-yes and --interactive are mutually exclusive.'
+  exit 1
+fi
 
 case "$interactive_bootstrap" in
   'true')
@@ -1200,12 +1137,6 @@ print_message 'debug' "# of extract hooks              '${#extract_hooks[@]}'"
 print_message 'debug' "# of essential hooks            '${#essential_hooks[@]}'"
 
 print_message 'debug' "# of target hooks               '${#target_hooks[@]}'"
-
-################################################################
-
-if [ "$only_then_exit" = 'print-packages' ]; then
-  declare discard_output='true'
-fi
 
 ################################################################################################################################
 
@@ -1377,7 +1308,7 @@ fi
 ################################################################
 
 for command in "${environment_hooks[@]}"; do
-  print_message 'debug' "running hook {
+  print_message 'debug' "running command(s) {
 $command
 }"
   /usr/bin/env bash -c "
@@ -1821,7 +1752,7 @@ fi
 ################################################################
 
 for command in "${download_hooks[@]}"; do
-  print_message 'debug' "running hook {
+  print_message 'debug' "running command(s) {
 $command
 }"
   /usr/bin/env bash -c "
@@ -1853,12 +1784,8 @@ if [ "$only_then_exit" = 'download-packages' ]; then
       print_message 'debug' "creating tarball '$workspace/$output_file_name.tar'"
       tar --create --file="$workspace/$output_file_name.tar" *.deb
       popd > /dev/null
-      if [ "$output_compression" = 'none' ]; then
-        print_message 'debug' "moving '$workspace/$output_file_name.tar' to '$output_directory'"
-        mv "$workspace/$output_file_name.tar" "$output_directory"
-      else
-        compress_and_move_output_file "$workspace/$output_file_name.tar" "$output_directory"
-      fi
+      print_message 'debug' "moving '$workspace/$output_file_name.tar' to '$output_directory'"
+      mv "$workspace/$output_file_name.tar" "$output_directory"
       ;;
   esac
   echo 'Base system package download complete.'
@@ -2250,7 +2177,7 @@ unset sources_list_format
 ################################################################
 
 for command in "${extract_hooks[@]}"; do
-  print_message 'debug' "running hook {
+  print_message 'debug' "running command(s) {
 $command
 }"
   /usr/bin/env bash -c "
@@ -2278,12 +2205,8 @@ if [ "$only_then_exit" = 'extract-packages' ]; then
       print_message 'debug' "creating tarball '$workspace/$output_file_name.tar'"
       tar --create --file="$workspace/$output_file_name.tar" *
       popd > /dev/null
-      if [ "$output_compression" = 'none' ]; then
-        print_message 'debug' "moving '$workspace/$output_file_name.tar' to '$output_directory'"
-        mv "$workspace/$output_file_name.tar" "$output_directory"
-      else
-        compress_and_move_output_file "$workspace/$output_file_name.tar" "$output_directory"
-      fi
+      print_message 'debug' "moving '$workspace/$output_file_name.tar' to '$output_directory'"
+      mv "$workspace/$output_file_name.tar" "$output_directory"
       ;;
   esac
   echo 'Base system package extraction complete.'
@@ -2368,7 +2291,7 @@ fi
 ################################################################
 
 for command in "${essential_hooks[@]}"; do
-  print_message 'debug' "running hook {
+  print_message 'debug' "running command(s) {
 $command
 }"
   /usr/bin/env bash -c "
@@ -2409,7 +2332,7 @@ fi
 ################################################################
 
 for command in "${target_hooks[@]}"; do
-  print_message 'debug' "running hook {
+  print_message 'debug' "running command(s) {
 $command
 }"
   /usr/bin/env bash -c "
@@ -2454,7 +2377,7 @@ fi
 
 unmount_virtual_kernel_file_systems "$target" || exit 1
 
-if [ "$keep_packages" = 'true' ]; then
+if [ "$keep_packages_directory" = 'true' ]; then
   print_message 'debug' "not removing directory '$all_packages'"
 else
   print_message 'debug' "removing temporary directory '$all_packages'"
@@ -2494,12 +2417,8 @@ case "$output_format" in
     print_message 'debug' "creating tarball '$workspace/$output_file_name.tar'"
     tar --create --file="$workspace/$output_file_name.tar" *
     popd > /dev/null
-    if [ "$output_compression" = 'none' ]; then
-      print_message 'debug' "moving '$workspace/$output_file_name.tar' to '$output_directory'"
-      mv "$workspace/$output_file_name.tar" "$output_directory"
-    else
-      compress_and_move_output_file "$workspace/$output_file_name.tar" "$output_directory"
-    fi
+    print_message 'debug' "moving '$workspace/$output_file_name.tar' to '$output_directory'"
+    mv "$workspace/$output_file_name.tar" "$output_directory"
     ;;
 esac
 
