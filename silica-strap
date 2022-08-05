@@ -406,6 +406,12 @@ for argument in "${provided_arguments[@]}"; do
       --target-hook)
         declare value_of_next_argument='target-hooks'
         ;;
+      --finishing-hook=*)
+        declare -a finishing_hooks+=("${argument#*=}")
+        ;;
+      --finishing-hook)
+        declare value_of_next_argument='finishing-hooks'
+        ;;
       --only-print)
         declare only_then_exit='print-packages'
         ;;
@@ -426,6 +432,9 @@ for argument in "${provided_arguments[@]}"; do
         ;;
       --keep-workspace)
         declare keep_workspace_directory='true'
+        ;;
+      --keep-apt-preferences)
+        declare keep_apt_preferences='true'
         ;;
       --skip-architecture-check)
         declare skip_architecture_check='true'
@@ -508,6 +517,9 @@ for argument in "${provided_arguments[@]}"; do
         ;;
       target-hooks)
         declare -a target_hooks+=("$argument")
+        ;;
+      finishing-hooks)
+        declare -a finishing_hooks+=("$argument")
         ;;
     esac
     unset value_of_next_argument
@@ -1046,14 +1058,9 @@ if [ -z "$merged_usr_type" ]; then
   declare merged_usr_type="$(default_merged_usr "${suites[0]}" "$variant")"
 fi
 
-case "$merged_usr_type" in
-  aliased-dirs)
-    print_message 'warning' '"merged-usr-via-aliased-dirs" might not be supported by dpkg.'
-    ;;
-  none)
-    declare -a packages_to_forbid+=('usrmerge')
-    ;;
-esac
+if [ "$merged_usr_type" = 'none' ]; then
+  declare -a packages_to_forbid+=('usrmerge')
+fi
 
 print_message 'debug' "merged /usr type                '$merged_usr_type'"
 
@@ -1150,6 +1157,8 @@ print_message 'debug' "# of extract hooks              '${#extract_hooks[@]}'"
 print_message 'debug' "# of essential hooks            '${#essential_hooks[@]}'"
 
 print_message 'debug' "# of target hooks               '${#target_hooks[@]}'"
+
+print_message 'debug' "# of finishing hooks            '${#finishing_hooks[@]}'"
 
 ################################################################################################################################
 
@@ -1447,6 +1456,20 @@ fi
 
 if [ "${#packages_to_forbid[@]}" != '0' ]; then
   declare -a packages_to_forbid=($(echo "${packages_to_forbid[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
+  print_message 'debug' "creating temporary file '$workspace/99-silica-strap-prefs'"
+  let counter='0'
+  for package in "${packages_to_forbid[@]}"; do
+    let counter+='1'
+    if [ "$counter" != '1' ]; then
+      echo '' >> "$workspace/99-silica-strap-prefs"
+    fi
+    cat << preferences >> "$workspace/99-silica-strap-prefs"
+Package: $package
+Pin: release *
+Pin-Priority: -10
+preferences
+  done
+  unset counter
   declare -a packages_to_exclude+=(${packages_to_forbid[@]})
 fi
 
@@ -1480,21 +1503,9 @@ fi
 
 case "$resolver" in
   'apt')
-    if [ "${#packages_to_forbid[@]}" != '0' ]; then
-      print_message 'debug' "creating temporary file '$environment/etc/apt/preferences.d/99silica-strap'"
-      let counter='0'
-      for package in "${packages_to_forbid[@]}"; do
-        let counter+='1'
-        if [ "$counter" != '1' ]; then
-          echo '' >> "$environment/etc/apt/preferences.d/99silica-strap"
-        fi
-        cat << preferences >> "$environment/etc/apt/preferences.d/99silica-strap"
-Package: $package
-Pin: release *
-Pin-Priority: -10
-preferences
-      done
-      unset counter
+    if [ -f "$workspace/99-silica-strap-prefs" ]; then
+      print_message 'debug' "copying '$workspace/99-silica-strap-prefs' to '$environment/etc/apt/preferences.d/99-silica-strap-prefs'"
+      cp "$workspace/99-silica-strap-prefs" "$environment/etc/apt/preferences.d/99-silica-strap-prefs"
     fi
     print_message 'debug' 'running apt inside the environment to calculate dependencies.'
     declare apt_results="$(
@@ -1515,9 +1526,9 @@ apt-get \
   install $(echo "${initial_package_set[@]}")
 " 2> /dev/stdout
     )"
-    if [ "${#packages_to_forbid[@]}" != '0' ]; then
-      print_message 'debug' "removing temporary file '$environment/etc/apt/preferences.d/99silica-strap'"
-      rm "$environment/etc/apt/preferences.d/99silica-strap"
+    if [ -f "$environment/etc/apt/preferences.d/99-silica-strap-prefs" ]; then
+      print_message 'debug' "removing temporary file '$environment/etc/apt/preferences.d/99-silica-strap-prefs'"
+      rm "$environment/etc/apt/preferences.d/99-silica-strap-prefs"
     fi
     declare -a target_package_set=(
       $(
@@ -2348,6 +2359,13 @@ fi
 
 ################################################################
 
+if [ -f "$workspace/99-silica-strap-prefs" ]; then
+  print_message 'debug' "copying '$workspace/99-silica-strap-prefs' to '$target/etc/apt/preferences.d/99-silica-strap-prefs'"
+  cp "$workspace/99-silica-strap-prefs" "$target/etc/apt/preferences.d/99-silica-strap-prefs"
+fi
+
+################################################################
+
 if [ "${#packages_to_install[@]}" != '0' ]; then
   print_message 'debug' 'downloading and installing chosen packages.'
   declare -a packages_to_install=($(echo "${packages_to_install[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
@@ -2392,6 +2410,17 @@ done
 
 ################################################################
 
+if [ -f "$target/etc/apt/preferences.d/99-silica-strap-prefs" ]; then
+  if [ "$keep_apt_preferences" = 'true' ]; then
+    print_message 'debug' "not removing file '$target/etc/apt/preferences.d/99-silica-strap-prefs'"
+  else
+    print_message 'debug' "removing temporary file '$target/etc/apt/preferences.d/99-silica-strap-prefs'"
+    rm --force "$target/etc/apt/preferences.d/99-silica-strap-prefs"
+  fi
+fi
+
+################################################################
+
 unmount_virtual_kernel_file_systems "$target" || exit 1
 
 if [ "$keep_packages_directory" = 'true' ]; then
@@ -2420,6 +2449,24 @@ rm --force "$target/etc/resolv.conf"
 print_message 'debug' "removing temporary file '$target/etc/hostname'"
 
 rm --force "$target/etc/hostname"
+
+################################################################
+
+for command in "${finishing_hooks[@]}"; do
+  print_message 'debug' "running command(s) {
+$command
+}"
+  /usr/bin/env bash -c "
+export CHROOT_DIRECTORY='$target'
+
+cd '$workspace'
+
+$command
+"
+  if [ "$?" != '0' ]; then
+    print_message 'warning' 'hook returned an error.'
+  fi
+done
 
 ################################################################
 
