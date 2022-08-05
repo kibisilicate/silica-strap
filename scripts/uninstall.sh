@@ -14,3 +14,8 @@ if [ -d '/usr/share/silica-strap' ]; then
   echo "removing directory '/usr/share/silica-strap'"
   rm --recursive '/usr/share/silica-strap'
 fi
+
+if [ -d '/var/cache/silica-strap' ]; then
+  echo "removing directory '/var/cache/silica-strap'"
+  rm --recursive '/var/cache/silica-strap'
+fi

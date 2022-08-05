@@ -17,8 +17,8 @@ done
 for key in "${!provided_arguments[@]}"; do
   if [ -z "$value_of_next_argument" ]; then
     case "${provided_arguments[key]}" in
-      --alternate-screen)
-        declare use_alternate_screen_buffer='true'
+      --clear-env-cache)
+        declare remove_environment_cache_then_exit='true'
         unset provided_arguments[key]
         ;;
       --color=*)
@@ -59,7 +59,7 @@ if [ -z "$chosen_colorful_output" ]; then
   if [ -n "$SILICA_STRAP_COLOR" ]; then
     declare chosen_colorful_output="$SILICA_STRAP_COLOR"
   elif [ -n "$NO_COLOR" ]; then
-    declare chosen_colorful_output='always'
+    declare chosen_colorful_output='never'
   else
     declare chosen_colorful_output='auto'
   fi
@@ -67,33 +67,33 @@ fi
 
 case "$chosen_colorful_output" in
   always)
-    declare colorful_output='true'
+    declare colorful_output='always'
     ;;
   never)
-    declare colorful_output='false'
+    declare colorful_output='never'
     ;;
   auto)
     if [ -t 1 ]; then
-      declare colorful_output='true'
+      declare colorful_output='always'
     else
-      declare colorful_output='false'
+      declare colorful_output='never'
     fi
     ;;
   *)
-    declare colorful_output='false'
+    declare colorful_output='never'
     ;;
 esac
 
 unset chosen_colorful_output
 
 case "$colorful_output" in
-  'true')
+  always)
     declare colorful_apt='true'
     declare colorful_dpkg='always'
     declare colorful_ls='always'
     declare term_env_var="$TERM"
     ;;
-  'false')
+  never)
     declare colorful_apt='false'
     declare colorful_dpkg='never'
     declare colorful_ls='never'
@@ -107,11 +107,11 @@ function print_message {
   case "$1" in
     error)
       case "$colorful_output" in
-        'true')
+        always)
           echo -e -n "\033[01;31merror\033[00m: "
           echo "$2"
           ;;
-        'false')
+        never)
           echo -n "error: "
           echo "$2"
           ;;
@@ -119,11 +119,11 @@ function print_message {
       ;;
     warning)
       case "$colorful_output" in
-        'true')
+        always)
           echo -e -n "\033[01;33mwarning\033[00m: "
           echo "$2"
           ;;
-        'false')
+        never)
           echo -n "warning: "
           echo "$2"
           ;;
@@ -132,11 +132,11 @@ function print_message {
     debug)
       if [ "$debug_output" = 'true' ]; then
         case "$colorful_output" in
-          'true')
+          always)
             echo -e -n "\033[01;36m[debug]\033[00m "
             echo "$2"
             ;;
-          'false')
+          never)
             echo -n "[debug] "
             echo "$2"
             ;;
@@ -163,7 +163,8 @@ else
   declare debconf_nowarnings='yes'
 fi
 
-if [ "$use_alternate_screen_buffer" = 'true' ]; then
+if [ -n "$SILICA_STRAP_ALT_SCREEN" ]; then
+  declare use_alternate_screen_buffer='true'
   tput smcup
   clear
 fi
@@ -211,8 +212,20 @@ fi
 
 source "$silica_strap_directory/releases"
 
+if [ "$remove_environment_cache_then_exit" = 'true' ]; then
+  echo 'Clearing environment cache ...'
+  if [ -d '/var/cache/silica-strap' ]; then
+    print_message 'debug' "removing directory '/var/cache/silica-strap'"
+    rm --recursive --force '/var/cache/silica-strap'
+  else
+    print_message 'debug' "directory '/var/cache/silica-strap' does not exist."
+  fi
+  echo 'Done.'
+  exit 0
+fi
+
 if [ -z "$SILICA_STRAP_ENV_CACHE" ]; then
-  declare environment_cache="/tmp/silica-strap-$(uname --machine)-environment.tar"
+  declare environment_cache="/var/cache/silica-strap/$(uname --machine)-minimal-environment.tar"
 elif [ -f "$SILICA_STRAP_ENV_CACHE" ]; then
   declare environment_cache="$SILICA_STRAP_ENV_CACHE"
 else
@@ -220,7 +233,7 @@ else
   exit 1
 fi
 
-print_message 'debug' "environment cache               '$environment_cache'"
+print_message 'debug' "environment cache location      '$environment_cache'"
 
 ################################################################
 
@@ -1186,10 +1199,15 @@ if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ] || [ "$extractor" = 'int
     esac
     unset yes_or_no
     echo 'Creating environment cache (this might take a while) ...'
+    if [ ! -d '/var/cache/silica-strap' ]; then
+      print_message 'debug' "creating directory '/var/cache/silica-strap'"
+      mkdir '/var/cache/silica-strap'
+    fi
     /usr/bin/env --ignore-environment bash -c "
 export HOME='/root'
 export TERM='$term_env_var'
 export PATH
+export SILICA_STRAP_ALT_SCREEN='true'
 export SILICA_STRAP_COLOR='$colorful_output'
 export SILICA_STRAP_DEBUG='$debug_output'
 export SILICA_STRAP_DIRECTORY='$silica_strap_directory'
@@ -1222,7 +1240,6 @@ silica-strap \
     ubuntu-keyring
     util-linux
   ' \
-  --alternate-screen \
   $(case "$assume_user_input" in assume-yes) echo '--assume-yes' ;; assume-no) echo '--assume-no' ;; esac)
 "
     declare exit_status="$?"
@@ -2331,24 +2348,6 @@ fi
 
 ################################################################
 
-for command in "${target_hooks[@]}"; do
-  print_message 'debug' "running command(s) {
-$command
-}"
-  /usr/bin/env bash -c "
-export CHROOT_DIRECTORY='$target'
-
-cd '$workspace'
-
-$command
-"
-  if [ "$?" != '0' ]; then
-    print_message 'warning' 'hook returned an error.'
-  fi
-done
-
-################################################################
-
 if [ "${#packages_to_install[@]}" != '0' ]; then
   print_message 'debug' 'downloading and installing chosen packages.'
   declare -a packages_to_install=($(echo "${packages_to_install[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
@@ -2372,6 +2371,24 @@ apt-get \
   install $(echo "${packages_to_install[@]}")
 "
 fi
+
+################################################################
+
+for command in "${target_hooks[@]}"; do
+  print_message 'debug' "running command(s) {
+$command
+}"
+  /usr/bin/env bash -c "
+export CHROOT_DIRECTORY='$target'
+
+cd '$workspace'
+
+$command
+"
+  if [ "$?" != '0' ]; then
+    print_message 'warning' 'hook returned an error.'
+  fi
+done
 
 ################################################################
 

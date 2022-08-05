@@ -58,7 +58,7 @@ declare my_downloader='apt'
 #declare my_downloader='wget'
 
 declare my_extractor='ar'
-#declare my_extractor='env-dpkg-deb'
+#declare my_extractor='internal-dpkg-deb'
 #declare my_extractor='host-dpkg-deb'
 
 silica-strap \
