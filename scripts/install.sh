@@ -20,7 +20,15 @@ if [ ! -f "$(pwd)/releases" ]; then
   exit 1
 fi
 
-"$(pwd)/scripts/uninstall.sh"
+if [ -L '/usr/bin/silica-strap' ]; then
+  echo "removing existing symlink '/usr/bin/silica-strap'"
+  rm '/usr/bin/silica-strap'
+fi
+
+if [ -d '/usr/share/silica-strap' ]; then
+  echo "removing existing directory '/usr/share/silica-strap'"
+  rm --recursive '/usr/share/silica-strap'
+fi
 
 mkdir --verbose '/usr/share/silica-strap'
 
