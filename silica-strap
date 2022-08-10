@@ -17,7 +17,7 @@ done
 for key in "${!provided_arguments[@]}"; do
   if [ -z "$value_of_next_argument" ]; then
     case "${provided_arguments[key]}" in
-      --clear-env-cache)
+      -C | --clear-cache)
         declare remove_environment_cache_then_exit='true'
         unset provided_arguments[key]
         ;;
@@ -133,11 +133,11 @@ function print_message {
       if [ "$debug_output" = 'true' ]; then
         case "$colorful_output" in
           always)
-            echo -e -n "\033[01;36m[debug]\033[00m "
+            echo -e -n "\033[01;36m[DEBUG]\033[00m "
             echo "$2"
             ;;
           never)
-            echo -n "[debug] "
+            echo -n "[DEBUG] "
             echo "$2"
             ;;
         esac
@@ -525,6 +525,8 @@ for argument in "${provided_arguments[@]}"; do
     unset value_of_next_argument
   fi
 done
+
+unset value_of_next_argument
 
 unset provided_arguments
 
@@ -1338,9 +1340,10 @@ for command in "${environment_hooks[@]}"; do
 $command
 }"
   /usr/bin/env bash -c "
-export CHROOT_DIRECTORY='$environment'
+export WORKSPACE='$workspace'
+export ENVIRONMENT='$environment'
 
-cd '$workspace'
+cd \"\$WORKSPACE\"
 
 $command
 "
@@ -1784,9 +1787,10 @@ for command in "${download_hooks[@]}"; do
 $command
 }"
   /usr/bin/env bash -c "
-export CHROOT_DIRECTORY='$environment'
+export WORKSPACE='$workspace'
+export ENVIRONMENT='$environment'
 
-cd '$workspace'
+cd \"\$WORKSPACE\"
 
 $command
 "
@@ -2209,9 +2213,10 @@ for command in "${extract_hooks[@]}"; do
 $command
 }"
   /usr/bin/env bash -c "
-export CHROOT_DIRECTORY='$target'
+export WORKSPACE='$workspace'
+export TARGET='$target'
 
-cd '$workspace'
+cd \"\$WORKSPACE\"
 
 $command
 "
@@ -2323,9 +2328,10 @@ for command in "${essential_hooks[@]}"; do
 $command
 }"
   /usr/bin/env bash -c "
-export CHROOT_DIRECTORY='$target'
+export WORKSPACE='$workspace'
+export TARGET='$target'
 
-cd '$workspace'
+cd \"\$WORKSPACE\"
 
 $command
 "
@@ -2397,9 +2403,10 @@ for command in "${target_hooks[@]}"; do
 $command
 }"
   /usr/bin/env bash -c "
-export CHROOT_DIRECTORY='$target'
+export WORKSPACE='$workspace'
+export TARGET='$target'
 
-cd '$workspace'
+cd \"\$WORKSPACE\"
 
 $command
 "
@@ -2457,9 +2464,10 @@ for command in "${finishing_hooks[@]}"; do
 $command
 }"
   /usr/bin/env bash -c "
-export CHROOT_DIRECTORY='$target'
+export WORKSPACE='$workspace'
+export TARGET='$target'
 
-cd '$workspace'
+cd \"\$WORKSPACE\"
 
 $command
 "

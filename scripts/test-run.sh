@@ -72,8 +72,8 @@ silica-strap \
   --downloader "$my_downloader" \
   --extractor "$my_extractor" \
   $(echo "$@") \
-#  --environment-hook="nano \"\$CHROOT_DIRECTORY/etc/apt/sources.list.d/sources.sources\"" \
-#  --target-hook="chroot \"\$CHROOT_DIRECTORY\" /usr/bin/env --ignore-environment bash -c \"export HOME='/root'; export TERM='$TERM'; bash --login\""
+#  --environment-hook="nano \"\$ENVIRONMENT/etc/apt/sources.list.d/sources.sources\"" \
+#  --target-hook="chroot \"\$TARGET\" /usr/bin/env --ignore-environment bash -c \"export HOME='/root'; export TERM='$TERM'; bash --login\""
 
 if [ "$?" = '0' ]; then
   exit 0
