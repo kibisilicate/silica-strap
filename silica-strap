@@ -1358,9 +1358,9 @@ if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ]; then
   chroot "$environment" /usr/bin/env --ignore-environment bash -c "
 export HOME='/root'
 export TERM='$term_env_var'
-export DEBIAN_FRONTEND='$debian_frontend'
-export DEBCONF_NONINTERACTIVE_SEEN='$debconf_noninteractive_seen'
-export DEBCONF_NOWARNINGS='$debconf_nowarnings'
+export DEBIAN_FRONTEND='noninteractive'
+export DEBCONF_NONINTERACTIVE_SEEN='true'
+export DEBCONF_NOWARNINGS='yes'
 export APT_CONFIG='/silica-strap-apt-config'
 
 apt-get \
@@ -1789,6 +1789,7 @@ $command
   /usr/bin/env bash -c "
 export WORKSPACE='$workspace'
 export ENVIRONMENT='$environment'
+export DOWNLOADED_PACKAGES='$downloaded_packages'
 
 cd \"\$WORKSPACE\"
 
@@ -2215,6 +2216,8 @@ $command
   /usr/bin/env bash -c "
 export WORKSPACE='$workspace'
 export TARGET='$target'
+export INITIAL_PACKAGES='$initial_packages'
+export REMAINING_PACKAGES='$remaining_packages'
 
 cd \"\$WORKSPACE\"
 
@@ -2306,7 +2309,7 @@ chroot "$target" /usr/bin/env --ignore-environment bash -c "
 export HOME='/root'
 export TERM='$term_env_var'
 export PATH
-export DEBIAN_FRONTEND='$debian_frontend'
+export DEBIAN_FRONTEND='$(if [ "$interactive_bootstrap" = 'true' ]; then echo 'teletype'; else echo 'noninteractive'; fi)'
 export DEBCONF_NONINTERACTIVE_SEEN='$debconf_noninteractive_seen'
 export DEBCONF_NOWARNINGS='$debconf_nowarnings'
 export DPKG_COLORS='$colorful_dpkg'
@@ -2330,6 +2333,8 @@ $command
   /usr/bin/env bash -c "
 export WORKSPACE='$workspace'
 export TARGET='$target'
+export INITIAL_PACKAGES='$initial_packages'
+export REMAINING_PACKAGES='$remaining_packages'
 
 cd \"\$WORKSPACE\"
 
@@ -2405,6 +2410,8 @@ $command
   /usr/bin/env bash -c "
 export WORKSPACE='$workspace'
 export TARGET='$target'
+export INITIAL_PACKAGES='$initial_packages'
+export REMAINING_PACKAGES='$remaining_packages'
 
 cd \"\$WORKSPACE\"
 
