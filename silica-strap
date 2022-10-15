@@ -2,8 +2,8 @@
 
 shopt -s extglob
 
-if [ -z "$1" ];
-  then declare print_usage_then_exit='true'
+if [ -z "$1" ]; then
+  declare print_usage_then_exit='true'
 fi
 
 declare version='0.1'
