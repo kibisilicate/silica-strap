@@ -1,56 +1,50 @@
 #! /usr/bin/env bash
 
-shopt -s extglob
+declare version='0.1'
 
 if [ -z "$1" ]; then
   declare print_usage_then_exit='true'
 fi
-
-declare version='0.1'
-
-declare workspace="/tmp/silica-strap_$(cat /dev/urandom | tr --delete --complement '[:alnum:]' | head --bytes=8)"
 
 for argument in "$@"; do
   declare -a provided_arguments+=("$argument")
 done
 
 for key in "${!provided_arguments[@]}"; do
-  if [ -z "$value_of_next_argument" ]; then
-    case "${provided_arguments[key]}" in
-      -C | --clear-cache)
-        declare remove_environment_cache_then_exit='true'
-        unset provided_arguments[key]
-        ;;
-      --color=*)
-        declare chosen_colorful_output="${provided_arguments[key]#*=}"
-        unset provided_arguments[key]
-        ;;
-      --color)
-        declare value_of_next_argument='colorful-output'
-        unset provided_arguments[key]
-        ;;
-      -d | --debug)
-        declare debug_output='true'
-        unset provided_arguments[key]
-        ;;
-      -h | --help)
-        declare print_usage_then_exit='true'
-        unset provided_arguments[key]
-        ;;
-      -V | --version)
-        declare print_version_then_exit='true'
-        unset provided_arguments[key]
-        ;;
-    esac
-  else
-    case "$value_of_next_argument" in
-      colorful-output)
-        declare chosen_colorful_output="${provided_arguments[key]}"
-        unset provided_arguments[key]
-        ;;
-    esac
-    unset value_of_next_argument
-  fi
+  case "${provided_arguments[key]}" in
+    -h | --help)
+      declare print_usage_then_exit='true'
+      unset provided_arguments[key]
+      ;;
+    -V | --version)
+      declare print_version_then_exit='true'
+      unset provided_arguments[key]
+      ;;
+    -d | --debug)
+      declare debug_output='true'
+      unset provided_arguments[key]
+      ;;
+    --color=*)
+      declare chosen_colorful_output="${provided_arguments[key]#*=}"
+      unset provided_arguments[key]
+      ;;
+    --discard)
+      declare discard_output='true'
+      unset provided_arguments[key]
+      ;;
+    -C | --clear-cache)
+      declare remove_environment_cache_then_exit='true'
+      unset provided_arguments[key]
+      ;;
+    -y | --yes | --assume-yes)
+      declare assume_user_input='assume-yes'
+      unset provided_arguments[key]
+      ;;
+    -n | --no | --assume-no)
+      declare assume_user_input='assume-no'
+      unset provided_arguments[key]
+      ;;
+  esac
 done
 
 ################################################################
@@ -157,16 +151,11 @@ if [ -n "$SILICA_STRAP_DEBUG" ]; then
   declare debug_output='true'
 fi
 
-if [ "$debug_output" = 'true' ]; then
-  declare debconf_nowarnings='no'
-else
-  declare debconf_nowarnings='yes'
-fi
-
-if [ -n "$SILICA_STRAP_ALT_SCREEN" ]; then
-  declare use_alternate_screen_buffer='true'
-  tput smcup
-  clear
+if [ "$print_usage_then_exit" = 'true' ]; then
+  cat << 'end_of_file'
+Placeholder message.
+end_of_file
+  exit 0
 fi
 
 if [ "$print_version_then_exit" = 'true' ]; then
@@ -174,7 +163,27 @@ if [ "$print_version_then_exit" = 'true' ]; then
   exit 0
 fi
 
-print_message 'debug' "silica-strap version            '$version'"
+if [ "$remove_environment_cache_then_exit" = 'true' ]; then
+  echo 'Clearing environment cache ...'
+  if [ -d '/var/cache/silica-strap' ]; then
+    print_message 'debug' "removing directory '/var/cache/silica-strap'"
+    rm --recursive --force '/var/cache/silica-strap'
+  else
+    print_message 'debug' "directory '/var/cache/silica-strap' does not exist."
+  fi
+  echo 'Done.'
+  exit 0
+fi
+
+if [ "$SILICA_STRAP_ALT_SCREEN" = 'true' ]; then
+  declare use_alternate_screen_buffer='true'
+  tput smcup
+  clear
+fi
+
+################################################################
+
+print_message 'debug' "silica-strap version:   '$version'"
 
 if [ -z "$SILICA_STRAP_DIRECTORY" ]; then
   declare silica_strap_directory='/usr/share/silica-strap'
@@ -182,7 +191,7 @@ else
   declare silica_strap_directory="$(realpath "$SILICA_STRAP_DIRECTORY")"
 fi
 
-print_message 'debug' "silica-strap directory          '$silica_strap_directory'"
+print_message 'debug' "silica-strap directory: '$silica_strap_directory'"
 
 if [ ! -d "$silica_strap_directory" ]; then
   print_message 'error' "directory '$silica_strap_directory' does not exist."
@@ -200,11 +209,6 @@ trap clean_up EXIT
 
 trap catch_ctrl_c INT
 
-if [ "$print_usage_then_exit" = 'true' ]; then
-  print_usage_message
-  exit 0
-fi
-
 if [ ! -f "$silica_strap_directory/releases" ]; then
   print_message 'error' "file '$silica_strap_directory/releases' does not exist."
   exit 1
@@ -212,323 +216,252 @@ fi
 
 source "$silica_strap_directory/releases"
 
-if [ "$remove_environment_cache_then_exit" = 'true' ]; then
-  echo 'Clearing environment cache ...'
-  if [ -d '/var/cache/silica-strap' ]; then
-    print_message 'debug' "removing directory '/var/cache/silica-strap'"
-    rm --recursive --force '/var/cache/silica-strap'
-  else
-    print_message 'debug' "directory '/var/cache/silica-strap' does not exist."
-  fi
-  echo 'Done.'
-  exit 0
-fi
-
-if [ -z "$SILICA_STRAP_ENV_CACHE" ]; then
-  declare environment_cache="/var/cache/silica-strap/$(uname --machine)-minimal-environment.tar"
-elif [ -f "$SILICA_STRAP_ENV_CACHE" ]; then
-  declare environment_cache="$SILICA_STRAP_ENV_CACHE"
-else
-  print_message 'error' "file '$SILICA_STRAP_ENV_CACHE' does not exist."
-  exit 1
-fi
-
-print_message 'debug' "environment cache location      '$environment_cache'"
-
 ################################################################
 
 for argument in "${provided_arguments[@]}"; do
-  if [ -z "$value_of_next_argument" ]; then
-    case "$argument" in
-      -a=* | --arch=* | --architecture=* | --architectures=*)
-        declare -a chosen_architectures+=($(echo "${argument#*=}" | tr '[:upper:]' '[:lower:]' | tr ',' ' '))
-        ;;
-      -a | --arch | --architecture | --architectures)
-        declare value_of_next_argument='architectures'
-        ;;
-      -r=* | --release=* | --releases=*)
-        declare -a suites+=($(echo "${argument#*=}" | tr ',' ' '))
-        ;;
-      -r | --release | --releases)
-        declare value_of_next_argument='suites'
-        ;;
-      -c=* | --comp=* | --component=* | --components=*)
-        declare -a components+=($(echo "${argument#*=}" | tr ',' ' '))
-        ;;
-      -c | --comp | --component | --components)
-        declare value_of_next_argument='components'
-        ;;
-      -v=* | --variant=*)
-        declare chosen_variant="${argument#*=}"
-        ;;
-      -v | --variant)
-        declare value_of_next_argument='variant'
-        ;;
-      -p=* | --package-set=*)
-        declare -a custom_package_set+=($(echo "${argument#*=}" | tr ',' ' '))
-        ;;
-      -p | --package-set)
-        declare value_of_next_argument='custom-package-set'
-        ;;
-      -i=* | --include=*)
-        declare -a packages_to_include+=($(echo "${argument#*=}" | tr ',' ' '))
-        ;;
-      -i | --include)
-        declare value_of_next_argument='packages-to-include'
-        ;;
-      -I=* | --install=*)
-        declare -a packages_to_install+=($(echo "${argument#*=}" | tr ',' ' '))
-        ;;
-      -I | --install)
-        declare value_of_next_argument='packages-to-install'
-        ;;
-      -e=* | --exclude=*)
-        declare -a packages_to_exclude+=($(echo "${argument#*=}" | tr ',' ' '))
-        ;;
-      -e | --exclude)
-        declare value_of_next_argument='packages-to-exclude'
-        ;;
-      -F=* | --forbid=*)
-        declare -a packages_to_forbid+=($(echo "${argument#*=}" | tr ',' ' '))
-        ;;
-      -F | --forbid)
-        declare value_of_next_argument='packages-to-forbid'
-        ;;
-      -o=* | --output=*)
-        declare chosen_output_location="$(realpath --quiet "${argument#*=}")"
-        ;;
-      -o | --output)
-        declare value_of_next_argument='output-location'
-        ;;
-      -f=* | --format=*)
-        declare chosen_output_format="${argument#*=}"
-        ;;
-      -f | --format)
-        declare value_of_next_argument='output-format'
-        ;;
-      -R=* | --resolver=*)
-        declare chosen_resolver="${argument#*=}"
-        ;;
-      -R | --resolver)
-        declare value_of_next_argument='resolver'
-        ;;
-      -D=* | --downloader=*)
-        declare chosen_downloader="${argument#*=}"
-        ;;
-      -D | --downloader)
-        declare value_of_next_argument='downloader'
-        ;;
-      -E=* | --extractor=*)
-        declare chosen_extractor="${argument#*=}"
-        ;;
-      -E | --extractor)
-        declare value_of_next_argument='extractor'
-        ;;
-      --extract-all)
-        declare packages_to_extract='all-packages'
-        ;;
-      --extract-essential)
-        declare packages_to_extract='essential-packages'
-        ;;
-      --include-essential=*)
-        declare -a include_essentials+=($(echo "${argument#*=}" | tr ',' ' '))
-        ;;
-      --include-essential)
-        declare value_of_next_argument='essential-packages-to-include'
-        ;;
-      --exclude-essential=*)
-        declare -a exclude_essentials+=($(echo "${argument#*=}" | tr ',' ' '))
-        ;;
-      --exclude-essential)
-        declare value_of_next_argument='essential-packages-to-exclude'
-        ;;
-      'ftp://'* | 'http://'* | 'https://'*)
-        declare -a chosen_mirrors+=("$argument")
-        ;;
-        # see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
-      --merged-usr)
-        declare merged_usr_type='aliased-dirs'
-        ;;
-      --no-merged-usr)
-        declare merged_usr_type='none'
-        ;;
-      --include-recommends)
-        declare include_recommends='true'
-        ;;
-      --no-include-recommends)
-        declare include_recommends='false'
-        ;;
-      --interactive)
-        declare interactive_bootstrap='true'
-        ;;
-      --non-interactive)
-        declare interactive_bootstrap='false'
-        ;;
-      --force-only-bash)
-        declare -a force_configuration+=('only-bash')
-        ;;
-      --force-only-gawk)
-        declare -a force_configuration+=('only-gawk')
-        ;;
-      --force-only-mawk)
-        declare -a force_configuration+=('only-mawk')
-        ;;
-      --force-only-original-awk)
-        declare -a force_configuration+=('only-original-awk')
-        ;;
-      --environment-hook=*)
-        declare -a environment_hooks+=("${argument#*=}")
-        ;;
-      --environment-hook)
-        declare value_of_next_argument='environment-hooks'
-        ;;
-      --download-hook=*)
-        declare -a download_hooks+=("${argument#*=}")
-        ;;
-      --download-hook)
-        declare value_of_next_argument='download-hooks'
-        ;;
-      --extract-hook=*)
-        declare -a extract_hooks+=("${argument#*=}")
-        ;;
-      --extract-hook)
-        declare value_of_next_argument='extract-hooks'
-        ;;
-      --essential-hook=*)
-        declare -a essential_hooks+=("${argument#*=}")
-        ;;
-      --essential-hook)
-        declare value_of_next_argument='essential-hooks'
-        ;;
-      --target-hook=*)
-        declare -a target_hooks+=("${argument#*=}")
-        ;;
-      --target-hook)
-        declare value_of_next_argument='target-hooks'
-        ;;
-      --finishing-hook=*)
-        declare -a finishing_hooks+=("${argument#*=}")
-        ;;
-      --finishing-hook)
-        declare value_of_next_argument='finishing-hooks'
-        ;;
-      --only-print)
-        declare only_then_exit='print-packages'
-        ;;
-      --only-download)
-        declare only_then_exit='download-packages'
-        ;;
-      --only-extract)
-        declare only_then_exit='extract-packages'
-        ;;
-      --deb822-style)
-        declare sources_list_format='deb822-style'
-        ;;
-      --one-line-style)
-        declare sources_list_format='one-line-style'
-        ;;
-      --keep-packages)
-        declare keep_packages_directory='true'
-        ;;
-      --keep-workspace)
-        declare keep_workspace_directory='true'
-        ;;
-      --keep-apt-preferences)
-        declare keep_apt_preferences='true'
-        ;;
-      --skip-architecture-check)
-        declare skip_architecture_check='true'
-        ;;
-      --discard-output)
-        declare discard_output='true'
-        ;;
-      -y | --yes | --assume-yes)
-        declare assume_user_input='assume-yes'
-        ;;
-      -n | --no | --assume-no)
-        declare assume_user_input='assume-no'
-        ;;
-      *)
-        print_message 'error' "unrecognized argument '$argument'"
-        exit 1
-        ;;
-    esac
-  else
-    case "$value_of_next_argument" in
-      architectures)
-        declare -a chosen_architectures+=($(echo "$argument" | tr '[:upper:]' '[:lower:]' | tr ',' ' '))
-        ;;
-      suites)
-        declare -a suites+=($(echo "$argument" | tr ',' ' '))
-        ;;
-      components)
-        declare -a components+=($(echo "$argument" | tr ',' ' '))
-        ;;
-      variant)
-        declare chosen_variant="$argument"
-        ;;
-      custom-package-set)
-        declare -a custom_package_set+=($(echo "$argument" | tr ',' ' '))
-        ;;
-      packages-to-include)
-        declare -a packages_to_include+=($(echo "$argument" | tr ',' ' '))
-        ;;
-      packages-to-install)
-        declare -a packages_to_install+=($(echo "$argument" | tr ',' ' '))
-        ;;
-      packages-to-exclude)
-        declare -a packages_to_exclude+=($(echo "$argument" | tr ',' ' '))
-        ;;
-      packages-to-forbid)
-        declare -a packages_to_forbid+=($(echo "$argument" | tr ',' ' '))
-        ;;
-      output-location)
-        declare chosen_output_location="$(realpath --quiet "$argument")"
-        ;;
-      output-format)
-        declare chosen_output_format="$argument"
-        ;;
-      resolver)
-        declare chosen_resolver="$argument"
-        ;;
-      downloader)
-        declare chosen_downloader="$argument"
-        ;;
-      extractor)
-        declare chosen_extractor="$argument"
-        ;;
-      essential-packages-to-include)
-        declare -a include_essentials+=($(echo "$argument" | tr ',' ' '))
-        ;;
-      essential-packages-to-exclude)
-        declare -a exclude_essentials+=($(echo "$argument" | tr ',' ' '))
-        ;;
-      environment-hooks)
-        declare -a environment_hooks+=("$argument")
-        ;;
-      download-hooks)
-        declare -a download_hooks+=("$argument")
-        ;;
-      extract-hooks)
-        declare -a extract_hooks+=("$argument")
-        ;;
-      essential-hooks)
-        declare -a essential_hooks+=("$argument")
-        ;;
-      target-hooks)
-        declare -a target_hooks+=("$argument")
-        ;;
-      finishing-hooks)
-        declare -a finishing_hooks+=("$argument")
-        ;;
-    esac
-    unset value_of_next_argument
-  fi
+  case "$argument" in
+    -o=* | --output=*)
+      declare chosen_output_location="$(realpath --quiet "${argument#*=}")"
+      ;;
+    -f=* | --format=*)
+      declare chosen_output_format="${argument#*=}"
+      ;;
+    -a=* | --arch=* | --architecture=* | --architectures=*)
+      declare -a chosen_architectures+=($(echo "${argument#*=}" | tr '[:upper:]' '[:lower:]' | tr '-' '_' | tr ',' ' '))
+      ;;
+    -r=* | --release=* | --releases=*)
+      declare -a suites+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    -c=* | --comp=* | --component=* | --components=*)
+      declare -a components+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    -v=* | --variant=*)
+      declare chosen_variant="${argument#*=}"
+      ;;
+    -p=* | --package-set=*)
+      declare -a custom_package_set+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    -i=* | --include=*)
+      declare -a packages_to_include+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    -e=* | --exclude=*)
+      declare -a packages_to_exclude+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    -I=* | --install=*)
+      declare -a packages_to_install+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    -F=* | --forbid=*)
+      declare -a packages_to_forbid+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    -R=* | --resolver=*)
+      declare chosen_resolver="${argument#*=}"
+      ;;
+    -D=* | --downloader=*)
+      declare chosen_downloader="${argument#*=}"
+      ;;
+    -E=* | --extractor=*)
+      declare chosen_extractor="${argument#*=}"
+      ;;
+    --extract-all)
+      declare packages_to_extract='all-packages'
+      ;;
+    --extract-essential)
+      declare packages_to_extract='essential-packages'
+      ;;
+    --consider-essential=*)
+      declare -a packages_to_consider_essential+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    --consider-non-essential=*)
+      declare -a packages_to_consider_non_essential+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    'ftp://'*)
+      declare -a chosen_mirrors+=("$argument")
+      ;;
+    'http://'*)
+      declare -a chosen_mirrors+=("$argument")
+      ;;
+    'https://'*)
+      declare -a chosen_mirrors+=("$argument")
+      ;;
+    -H=* | --hostname=*)
+      declare chosen_hostname="${argument#*=}"
+      ;;
+    --force-only-bash)
+      declare -a force_configuration+=('only-bash')
+      ;;
+    --force-only-gawk)
+      declare -a force_configuration+=('only-gawk')
+      ;;
+    --force-only-mawk)
+      declare -a force_configuration+=('only-mawk')
+      ;;
+    --force-only-original-awk)
+      declare -a force_configuration+=('only-original-awk')
+      ;;
+    --merged-usr) # see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
+      declare merged_usr_type='aliased-dirs'
+      ;;
+    --no-merged-usr)
+      declare merged_usr_type='none'
+      ;;
+    --include-recommends)
+      declare include_recommends='true'
+      ;;
+    --no-include-recommends)
+      declare include_recommends='false'
+      ;;
+    --install-recommends)
+      declare install_recommends='true'
+      ;;
+    --no-install-recommends)
+      declare install_recommends='false'
+      ;;
+    --interactive)
+      declare interactive_bootstrap='true'
+      ;;
+    --non-interactive)
+      declare interactive_bootstrap='false'
+      ;;
+    --environment-hook=*)
+      declare -a environment_hooks+=("${argument#*=}")
+      ;;
+    --download-hook=*)
+      declare -a download_hooks+=("${argument#*=}")
+      ;;
+    --extract-hook=*)
+      declare -a extract_hooks+=("${argument#*=}")
+      ;;
+    --essential-hook=*)
+      declare -a essential_hooks+=("${argument#*=}")
+      ;;
+    --target-hook=*)
+      declare -a target_hooks+=("${argument#*=}")
+      ;;
+    --finishing-hook=*)
+      declare -a finishing_hooks+=("${argument#*=}")
+      ;;
+    --skip-architecture-check)
+      declare skip_architecture_check='true'
+      ;;
+    --print-initial)
+      declare only_action_then_exit='print-initial-packages'
+      ;;
+    --print-target)
+      declare only_action_then_exit='print-target-packages'
+      ;;
+    --print-all)
+      declare only_action_then_exit='print-all-packages'
+      ;;
+    --only-download)
+      declare only_action_then_exit='download-packages'
+      ;;
+    --only-extract)
+      declare only_action_then_exit='extract-packages'
+      ;;
+    --deb822-style)
+      declare sources_list_format='deb822-style'
+      ;;
+    --one-line-style)
+      declare sources_list_format='one-line-style'
+      ;;
+    --keep-packages)
+      declare keep_packages_directory='true'
+      ;;
+    --keep-workspace)
+      declare keep_workspace_directory='true'
+      ;;
+    --keep-apt-preferences)
+      declare keep_apt_preferences='true'
+      ;;
+    *)
+      print_message 'error' "unrecognized argument '$argument'"
+      exit 1
+      ;;
+  esac
 done
 
-unset value_of_next_argument
-
 unset provided_arguments
+
+################################################################################################################################
+
+declare workspace="/tmp/silica-strap_$(cat /dev/urandom | tr --delete --complement '[:alnum:]' | head --bytes=8)"
+
+case "$only_action_then_exit" in
+  print-initial-packages | print-target-packages | print-all-packages)
+    declare discard_output='true'
+    ;;
+esac
+
+if [ "$discard_output" = 'true' ]; then
+  print_message 'debug' 'ignoring any provided output location.'
+  declare implied_format='directory'
+  declare output_directory="$workspace/output"
+elif [ -z "$chosen_output_location" ]; then
+  print_message 'error' 'no output location was provided.'
+  exit 1
+elif [ -f "$chosen_output_location" ]; then
+  print_message 'error' "file '$chosen_output_location' already exists."
+  exit 1
+elif [ -d "$chosen_output_location" ]; then
+  declare implied_format='directory'
+  declare output_directory="$chosen_output_location"
+else
+  declare chosen_output_directory="$(dirname "$chosen_output_location")"
+  if [ -d "$chosen_output_directory" ]; then
+    declare output_directory="$chosen_output_directory"
+  else
+    print_message 'error' "directory '$chosen_output_directory' does not exist."
+    exit 1
+  fi
+  unset chosen_output_directory
+  declare chosen_output_file_name="$(basename "$chosen_output_location")"
+  case "$chosen_output_file_name" in
+    *'.tar')
+      declare implied_format='tarball'
+      ;;
+    *)
+      print_message 'error' "invalid file name '$chosen_output_location'"
+      exit 1
+      ;;
+  esac
+  declare chosen_output_file_name="${chosen_output_file_name%.*}"
+fi
+
+unset chosen_output_location
+
+print_message 'debug' "output directory:     '$output_directory'"
+
+################################################################
+
+if [ -z "$chosen_output_format" ]; then
+  declare chosen_output_format="$implied_format"
+fi
+
+case "$chosen_output_format" in
+  directory | 'dir')
+    declare output_format='directory'
+    ;;
+  tarball | 'tar')
+    declare output_format='tarball'
+    ;;
+  *)
+    print_message 'error' "unrecognized format '$chosen_output_format'"
+    exit 1
+    ;;
+esac
+
+unset chosen_output_format
+
+print_message 'debug' "output format:        '$output_format'"
+
+if [ "$implied_format" != 'directory' ]; then
+  if [ "$output_format" != "$implied_format" ]; then
+    print_message 'error' "format '$output_format' was chosen but output file implied '$implied_format'"
+    exit 1
+  fi
+fi
+
+unset implied_format
 
 ################################################################
 
@@ -562,7 +495,7 @@ for architecture in "${chosen_architectures[@]}"; do
         declare alpha_present='true'
       fi
       ;;
-    amd64 | x86_64 | x86-64 | x64)
+    amd64 | x86_64 | x64)
       if [ -z "$amd64_present" ]; then
         declare -a architectures+=('amd64')
         declare amd64_present='true'
@@ -580,7 +513,7 @@ for architecture in "${chosen_architectures[@]}"; do
         declare armel_present='true'
       fi
       ;;
-    armhf | armv7l)
+    armhf | aarch32 | armv7l)
       if [ -z "$armhf_present" ]; then
         declare -a architectures+=('armhf')
         declare armhf_present='true'
@@ -592,7 +525,7 @@ for architecture in "${chosen_architectures[@]}"; do
         declare hppa_present='true'
       fi
       ;;
-    i386 | i686 | ia32 | x86)
+    i386 | i686 | ia32 | x86 | x86_32)
       if [ -z "$i386_present" ]; then
         declare -a architectures+=('i386')
         declare i386_present='true'
@@ -634,13 +567,13 @@ for architecture in "${chosen_architectures[@]}"; do
         declare ppc64_present='true'
       fi
       ;;
-    ppc64el | ppc64le)
+    ppc64el | ppc64le | powerpc64le)
       if [ -z "$ppc64el_present" ]; then
         declare -a architectures+=('ppc64el')
         declare ppc64el_present='true'
       fi
       ;;
-    riscv64 | risc_v | risc-v)
+    riscv64 | risc_v | riscv)
       if [ -z "$riscv64_present" ]; then
         declare -a architectures+=('riscv64')
         declare riscv64_present='true'
@@ -717,14 +650,14 @@ unset sparc64_present
 
 unset x32_present
 
-print_message 'debug' "architecture(s)                 $(for architecture in "${architectures[@]}"; do echo -n "'$architecture'"; done | sed --expression "s/''/' '/g")"
+print_message 'debug' "architecture(s):      $(for architecture in "${architectures[@]}"; do echo -n "'$architecture'"; done | sed --expression "s/''/' '/g")"
 
 if [ "$skip_architecture_check" = 'true' ]; then
   print_message 'debug' 'skipping architecture check.'
 else
   for architecture in "${architectures[@]}"; do
     if [ "$(arch-test "$architecture")" != "$architecture: ok" ]; then
-      if [ -z "$only_then_exit" ]; then
+      if [ -z "$only_action_then_exit" ]; then
         print_message 'error' "architecture '$architecture' is not executable by the host kernel."
         exit 1
       fi
@@ -746,7 +679,7 @@ if ! check_primary_suite "${suites[0]}"; then
   exit 1
 fi
 
-print_message 'debug' "suite(s)                        $(for suite in "${suites[@]}"; do echo -n "'$suite'"; done | sed --expression "s/''/' '/g")"
+print_message 'debug' "suite(s):             $(for suite in "${suites[@]}"; do echo -n "'$suite'"; done | sed --expression "s/''/' '/g")"
 
 ################################################################
 
@@ -754,7 +687,7 @@ if [ "${#components[@]}" = '0' ]; then
   declare -a components=('main')
 fi
 
-print_message 'debug' "component(s)                    $(for component in "${components[@]}"; do echo -n "'$component'"; done | sed --expression "s/''/' '/g")"
+print_message 'debug' "component(s):         $(for component in "${components[@]}"; do echo -n "'$component'"; done | sed --expression "s/''/' '/g")"
 
 ################################################################
 
@@ -792,7 +725,9 @@ esac
 
 unset chosen_variant
 
-print_message 'debug' "variant                         '$variant'"
+print_message 'debug' "variant:              '$variant'"
+
+print_message 'debug' "# of packages in custom set: '${#custom_package_set[@]}'"
 
 if [ "$variant" = 'custom' ]; then
   if [ "${#custom_package_set[@]}" = '0' ]; then
@@ -803,117 +738,6 @@ elif [ "${#custom_package_set[@]}" != '0' ]; then
   print_message 'error' "only the variant 'custom' can use a custom package set."
   exit 1
 fi
-
-for package in $(suite_specific_extras "$variant" "${suites[0]}"); do
-  declare -a packages_to_include+=("$package")
-done
-
-print_message 'debug' "# of custom package set         '${#custom_package_set[@]}'"
-
-print_message 'debug' "# of packages to include        '${#packages_to_include[@]}'"
-
-print_message 'debug' "# of packages to install        '${#packages_to_install[@]}'"
-
-print_message 'debug' "# of packages to exclude        '${#packages_to_exclude[@]}'"
-
-print_message 'debug' "# of packages to forbid         '${#packages_to_forbid[@]}'"
-
-################################################################
-
-if [ "$only_then_exit" = 'print-packages' ]; then
-  declare discard_output='true'
-fi
-
-if [ "$discard_output" = 'true' ]; then
-  print_message 'debug' 'ignoring any provided output location.'
-  declare implied_format='directory'
-  declare output_directory="$workspace/output"
-elif [ -z "$chosen_output_location" ]; then
-  print_message 'error' 'no output location was provided.'
-  exit 1
-elif [ -d "$chosen_output_location" ]; then
-  declare implied_format='directory'
-  declare output_directory="$chosen_output_location"
-else
-  declare chosen_output_directory="$(dirname "$chosen_output_location")"
-  if [ -d "$chosen_output_directory" ]; then
-    declare output_directory="$chosen_output_directory"
-  else
-    print_message 'error' "directory '$chosen_output_directory' does not exist."
-    exit 1
-  fi
-  unset chosen_output_directory
-  declare chosen_output_file_name="$(basename "$chosen_output_location")"
-  case "$chosen_output_file_name" in
-    *'.tar')
-      declare implied_format='tarball'
-      ;;
-    *)
-      print_message 'error' "invalid file name '$chosen_output_location'"
-      exit 1
-      ;;
-  esac
-  declare chosen_output_file_name="${chosen_output_file_name%.*}"
-fi
-
-unset chosen_output_location
-
-print_message 'debug' "output directory                '$output_directory'"
-
-################################################################
-
-if [ -z "$chosen_output_format" ]; then
-  declare chosen_output_format="$implied_format"
-fi
-
-case "$chosen_output_format" in
-  directory | 'dir')
-    declare output_format='directory'
-    ;;
-  tarball | 'tar')
-    declare output_format='tarball'
-    ;;
-  *)
-    print_message 'error' "unrecognized format '$chosen_output_format'"
-    exit 1
-    ;;
-esac
-
-unset chosen_output_format
-
-print_message 'debug' "output format                   '$output_format'"
-
-if [ "$implied_format" != 'directory' ]; then
-  if [ "$output_format" != "$implied_format" ]; then
-    print_message 'error' "format '$output_format' was chosen but output file implied '$implied_format'"
-    exit 1
-  fi
-fi
-
-unset implied_format
-
-################################################################
-
-case "$output_format" in
-  tarball)
-    if [ -z "$chosen_output_file_name" ]; then
-      declare output_file_name="$(default_output_file_name "${suites[0]}" "${architectures[0]}")"
-      case "$only_then_exit" in
-        download-packages)
-          declare output_file_name="Packages_$output_file_name"
-          ;;
-        extract-packages)
-          declare output_file_name="Extracted_$output_file_name"
-          ;;
-      esac
-    else
-      declare output_file_name="$chosen_output_file_name"
-    fi
-    print_message 'debug' "output file name                '$output_file_name'"
-    ;;
-esac
-
-unset chosen_output_file_name
 
 ################################################################
 
@@ -939,7 +763,7 @@ esac
 
 unset chosen_resolver
 
-print_message 'debug' "resolver                        '$resolver'"
+print_message 'debug' "resolver:             '$resolver'"
 
 ################################################################
 
@@ -979,7 +803,7 @@ esac
 
 unset chosen_downloader
 
-print_message 'debug' "downloader                      '$downloader'"
+print_message 'debug' "downloader:           '$downloader'"
 
 if [ "$downloader" = 'curl' ] && ! command -v curl &> /dev/null; then
   print_message 'error' 'curl is not available on the host.'
@@ -1021,7 +845,7 @@ esac
 
 unset chosen_extractor
 
-print_message 'debug' "extractor                       '$extractor'"
+print_message 'debug' "extractor:            '$extractor'"
 
 if [ "$extractor" = 'host-dpkg-deb' ] && ! command -v dpkg-deb &> /dev/null; then
   print_message 'error' 'dpkg-deb is not available on the host.'
@@ -1032,7 +856,11 @@ if [ -z "$packages_to_extract" ]; then
   declare packages_to_extract='essential-packages'
 fi
 
-print_message 'debug' "packages to extract             '$packages_to_extract'"
+print_message 'debug' "packages to extract: '$packages_to_extract'"
+
+print_message 'debug' "# of packages to consider essential:     '${#packages_to_consider_essential[@]}'"
+
+print_message 'debug' "# of packages to consider non-essential: '${#packages_to_consider_non_essential[@]}'"
 
 ################################################################
 
@@ -1048,68 +876,19 @@ done
 
 unset chosen_mirrors
 
-print_message 'debug' "mirror(s)                       $(for uri in "${mirrors[@]}"; do echo -n "'$uri'"; done | sed --expression "s/''/' '/g")"
+print_message 'debug' "mirror(s): $(for uri in "${mirrors[@]}"; do echo -n "'$uri'"; done | sed --expression "s/''/' '/g")"
 
 # TODO add a test for the chosen mirror and if it fails then fallback to the default mirror.
 
 ################################################################
 
-# see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
-
-if [ -z "$merged_usr_type" ]; then
-  declare merged_usr_type="$(default_merged_usr "${suites[0]}" "$variant")"
+if [ -z "$chosen_hostname" ]; then
+  declare hostname="$(default_hostname "${suites[0]}")"
+else
+  declare hostname="$chosen_hostname"
 fi
 
-if [ "$merged_usr_type" = 'none' ]; then
-  declare -a packages_to_forbid+=('usrmerge')
-fi
-
-print_message 'debug' "merged /usr type                '$merged_usr_type'"
-
-################################################################
-
-if [ -z "$include_recommends" ]; then
-  declare include_recommends='false'
-fi
-
-print_message 'debug' "include recommends              '$include_recommends'"
-
-if [ "$resolver" != 'apt' ] && [ "$include_recommends" = 'true' ]; then
-  print_message 'error' "only the resolver 'apt' supports --include-recommends"
-  exit 1
-fi
-
-################################################################
-
-if [ -z "$interactive_bootstrap" ]; then
-  if [ "$assume_user_input" = 'assume-yes' ]; then
-    declare interactive_bootstrap='false'
-  elif [ -t 1 ]; then
-    declare interactive_bootstrap='true'
-  else
-    declare interactive_bootstrap='false'
-  fi
-fi
-
-print_message 'debug' "interactive bootstrap           '$interactive_bootstrap'"
-
-if [ "$assume_user_input" = 'assume-yes' ] && [ "$interactive_bootstrap" = 'true' ]; then
-  print_message 'error' '--assume-yes and --interactive are mutually exclusive.'
-  exit 1
-fi
-
-case "$interactive_bootstrap" in
-  'true')
-    declare apt_assume_yes='false'
-    declare debian_frontend='dialog'
-    declare debconf_noninteractive_seen='false'
-    ;;
-  'false')
-    declare apt_assume_yes='true'
-    declare debian_frontend='noninteractive'
-    declare debconf_noninteractive_seen='true'
-    ;;
-esac
+unset chosen_hostname
 
 ################################################################
 
@@ -1150,17 +929,103 @@ unset force_configuration
 
 ################################################################
 
-print_message 'debug' "# of environment hooks          '${#environment_hooks[@]}'"
+# see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
 
-print_message 'debug' "# of download hooks             '${#download_hooks[@]}'"
+if [ -z "$merged_usr_type" ]; then
+  declare merged_usr_type="$(default_merged_usr "${suites[0]}" "$variant")"
+fi
 
-print_message 'debug' "# of extract hooks              '${#extract_hooks[@]}'"
+if [ "$merged_usr_type" = 'none' ]; then
+  declare -a packages_to_forbid+=('usrmerge')
+fi
 
-print_message 'debug' "# of essential hooks            '${#essential_hooks[@]}'"
+print_message 'debug' "merged /usr type: '$merged_usr_type'"
 
-print_message 'debug' "# of target hooks               '${#target_hooks[@]}'"
+################################################################
 
-print_message 'debug' "# of finishing hooks            '${#finishing_hooks[@]}'"
+if [ -z "$include_recommends" ]; then
+  declare include_recommends='false'
+fi
+
+print_message 'debug' "include recommends: '$include_recommends'"
+
+if [ "$resolver" != 'apt' ] && [ "$include_recommends" = 'true' ]; then
+  print_message 'error' "only the resolver 'apt' supports --include-recommends"
+  exit 1
+fi
+
+if [ -z "$install_recommends" ]; then
+  declare install_recommends='true'
+fi
+
+print_message 'debug' "install recommends: '$install_recommends'"
+
+################################################################
+
+if [ -z "$interactive_bootstrap" ]; then
+  declare interactive_bootstrap='false'
+fi
+
+print_message 'debug' "interactive bootstrap: '$interactive_bootstrap'"
+
+if [ "$assume_user_input" = 'assume-yes' ] && [ "$interactive_bootstrap" = 'true' ]; then
+  print_message 'error' '--assume-yes and --interactive are mutually exclusive.'
+  exit 1
+fi
+
+case "$interactive_bootstrap" in
+  'true')
+    declare apt_assume_yes='false'
+    declare debian_frontend='dialog'
+    declare debconf_noninteractive_seen='false'
+    ;;
+  'false')
+    declare apt_assume_yes='true'
+    declare debian_frontend='noninteractive'
+    declare debconf_noninteractive_seen='true'
+    ;;
+esac
+
+################################################################
+
+for package in $(case_specific_packages "$variant" "${suites[0]}"); do
+  declare -a packages_to_include+=("$package")
+done
+
+if [ "$output_format" = 'tarball' ]; then
+  if [ -z "$chosen_output_file_name" ]; then
+    declare output_file_name="$(default_output_file_name "${suites[0]}" "${architectures[0]}")"
+    if [ "$output_format" = 'tarball' ]; then
+      case "$only_action_then_exit" in
+        download-packages)
+          declare output_file_name="Packages_$output_file_name"
+          ;;
+        extract-packages)
+          declare output_file_name="Extracted_$output_file_name"
+          ;;
+      esac
+    fi
+  else
+    declare output_file_name="$chosen_output_file_name"
+  fi
+fi
+
+unset chosen_output_file_name
+
+print_message 'debug' "output file name:     '$output_file_name'"
+
+################################################################
+
+print_message 'debug' "# of packages to include: '${#packages_to_include[@]}'"
+print_message 'debug' "# of packages to install: '${#packages_to_install[@]}'"
+print_message 'debug' "# of packages to exclude: '${#packages_to_exclude[@]}'"
+print_message 'debug' "# of packages to forbid:  '${#packages_to_forbid[@]}'"
+print_message 'debug' "# of environment hooks:   '${#environment_hooks[@]}'"
+print_message 'debug' "# of download hooks:      '${#download_hooks[@]}'"
+print_message 'debug' "# of extract hooks:       '${#extract_hooks[@]}'"
+print_message 'debug' "# of essential hooks:     '${#essential_hooks[@]}'"
+print_message 'debug' "# of target hooks:        '${#target_hooks[@]}'"
+print_message 'debug' "# of finishing hooks:     '${#finishing_hooks[@]}'"
 
 ################################################################################################################################
 
@@ -1178,8 +1043,17 @@ if [ "$discard_output" = 'true' ]; then
 fi
 
 if [ "$resolver" = 'apt' ] || [ "$downloader" = 'apt' ] || [ "$extractor" = 'internal-dpkg-deb' ]; then
+  if [ -z "$SILICA_STRAP_ENV_CACHE" ]; then
+    declare environment_cache="/var/cache/silica-strap/$(uname --machine)-minimal-environment.tar"
+  elif [ -f "$SILICA_STRAP_ENV_CACHE" ]; then
+    declare environment_cache="$SILICA_STRAP_ENV_CACHE"
+  else
+    print_message 'error' "file '$SILICA_STRAP_ENV_CACHE' does not exist."
+    exit 1
+  fi
   if [ ! -f "$environment_cache" ]; then
-    echo -n 'No environment cache was found, do you want to create one? [Y/n] '
+    print_message 'warning' "file '$environment_cache' does not exist."
+    echo -n 'Do you want to create it now? [Y/n] '
     if [ -z "$assume_user_input" ]; then
       read yes_or_no
     else
@@ -1376,7 +1250,7 @@ apt-get \
       sed --expression 's/.*:\/\///' |
       tr '\/' '_'
   )_dists_${suites[0]}_${components[0]}_binary-${architectures[0]}_Packages"
-  print_message 'debug' "copying '$primary_package_list_file' to '$workspace/primary_package_list'"
+  print_message 'debug' "copying '$(basename "$primary_package_list_file")' to '$workspace/primary_package_list'"
   cp "$primary_package_list_file" "$workspace/primary_package_list"
   unset primary_package_list_file
 else
@@ -1457,22 +1331,33 @@ if [ "${#packages_to_include[@]}" != '0' ]; then
   declare -a initial_package_set=($(echo "${initial_package_set[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
 fi
 
+#if [ "${#packages_to_forbid[@]}" != '0' ]; then
+#  declare -a packages_to_forbid=($(echo "${packages_to_forbid[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
+#  print_message 'debug' "creating temporary file '$workspace/99-silica-strap-prefs'"
+#  let counter='0'
+#  for package in "${packages_to_forbid[@]}"; do
+#    let counter+='1'
+#    if [ "$counter" != '1' ]; then
+#      echo '' >> "$workspace/99-silica-strap-prefs"
+#    fi
+#    cat << preferences >> "$workspace/99-silica-strap-prefs"
+#Package: $package
+#Pin: release *
+#Pin-Priority: -10
+#preferences
+#  done
+#  unset counter
+#  declare -a packages_to_exclude+=(${packages_to_forbid[@]})
+#fi
+
 if [ "${#packages_to_forbid[@]}" != '0' ]; then
   declare -a packages_to_forbid=($(echo "${packages_to_forbid[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
   print_message 'debug' "creating temporary file '$workspace/99-silica-strap-prefs'"
-  let counter='0'
-  for package in "${packages_to_forbid[@]}"; do
-    let counter+='1'
-    if [ "$counter" != '1' ]; then
-      echo '' >> "$workspace/99-silica-strap-prefs"
-    fi
-    cat << preferences >> "$workspace/99-silica-strap-prefs"
-Package: $package
+  cat << preferences >> "$workspace/99-silica-strap-prefs"
+Package: ${packages_to_forbid[@]}
 Pin: release *
 Pin-Priority: -10
 preferences
-  done
-  unset counter
   declare -a packages_to_exclude+=(${packages_to_forbid[@]})
 fi
 
@@ -1496,11 +1381,16 @@ fi
 
 ################################################################
 
-if [ "$only_then_exit" = 'print-packages' ]; then
-  echo -e "\n${initial_package_set[@]}" | tr ' ' '\n'
-  echo -e "\n${initial_package_set[@]}" | fold --spaces --width="$COLUMNS"
-  echo -e "\n${#initial_package_set[@]} packages before dependencies.\n"
-fi
+case "$only_action_then_exit" in
+  print-initial-packages | print-all-packages)
+    echo -e "\n${initial_package_set[@]}" | tr ' ' '\n'
+    echo -e "\n${initial_package_set[@]}" | fold --spaces --width="$COLUMNS"
+    echo -e "\n${#initial_package_set[@]} packages before dependencies.\n"
+    if [ "$only_action_then_exit" = 'print-initial-packages' ]; then
+      exit 0
+    fi
+    ;;
+esac
 
 ################################################################
 
@@ -1549,20 +1439,43 @@ apt-get \
     let counter='0'
     until [ "${#input_packages[@]}" = '0' ]; do
       for key in "${!input_packages[@]}"; do
-        if [ -z "$(cat "$workspace/primary_package_list" | grep --regexp="^Package: ${input_packages[key]}$")" ]; then
-          print_message 'debug' "package ignored '${input_packages[key]}'"
-          unset input_packages[key]
-        else
-          for package in "${packages_to_forbid[@]}"; do
-            if [ "$package" = "${input_packages[key]}" ]; then
-              print_message 'debug' "package ignored '${input_packages[key]}'"
+        case "${input_packages[key]}" in
+          'default-dbus-system-bus')
+            print_message 'debug' "choosing 'dbus' over '${input_packages[key]}'"
+            unset input_packages[key]
+            declare -a input_packages+=('dbus')
+            ;;
+          'perl:any')
+            print_message 'debug' "choosing 'perl' over '${input_packages[key]}'"
+            unset input_packages[key]
+            declare -a input_packages+=('perl')
+            ;;
+          'perlapi-'*)
+            print_message 'debug' "choosing 'perl-base' over '${input_packages[key]}'"
+            unset input_packages[key]
+            declare -a input_packages+=('perl-base')
+            ;;
+          'python3:any')
+            print_message 'debug' "choosing 'python3' over '${input_packages[key]}'"
+            unset input_packages[key]
+            declare -a input_packages+=('python3')
+            ;;
+          *)
+            if [ -z "$(cat "$workspace/primary_package_list" | grep --regexp="^Package: ${input_packages[key]}$")" ]; then
+              print_message 'debug' "ignoring '${input_packages[key]}'"
               unset input_packages[key]
             fi
-          done
-        fi
+            ;;
+        esac
+        for package in "${packages_to_forbid[@]}"; do
+          if [ "$package" = "${input_packages[key]}" ]; then
+            print_message 'debug' "ignoring '${input_packages[key]}'"
+            unset input_packages[key]
+          fi
+        done
       done
       declare -a target_package_set=($(echo "${target_package_set[@]} ${input_packages[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-      echo "Iteration $counter, ${#input_packages[@]} packages."
+      echo "Iteration '$counter', amount of packages: '${#input_packages[@]}'"
       let counter+='1'
       declare -a new_packages=(
         $(
@@ -1612,12 +1525,14 @@ fi
 
 ################################################################
 
-if [ "$only_then_exit" = 'print-packages' ]; then
-  echo -e "\n${target_package_set[@]}" | tr ' ' '\n'
-  echo -e "\n${target_package_set[@]}" | fold --spaces --width="$COLUMNS"
-  echo -e "\n${#target_package_set[@]} packages total.\n"
-  exit 0
-fi
+case "$only_action_then_exit" in
+  print-target-packages | print-all-packages)
+    echo -e "\n${target_package_set[@]}" | tr ' ' '\n'
+    echo -e "\n${target_package_set[@]}" | fold --spaces --width="$COLUMNS"
+    echo -e "\n${#target_package_set[@]} packages total.\n"
+    exit 0
+    ;;
+esac
 
 ################################################################
 
@@ -1745,7 +1660,7 @@ apt-get \
     print_message 'error' 'failed to download packages.'
     exit 1
   fi
-  print_message 'debug' "moving all .deb files from '$environment/tmp' to '$downloaded_packages'"
+  print_message 'debug' "moving all packages from '$environment/tmp' to '$downloaded_packages'"
   mv "$environment/tmp/"*.deb "$downloaded_packages"
 else
   let counter='0'
@@ -1802,20 +1717,23 @@ done
 
 ################################################################
 
-if [ "$only_then_exit" = 'download-packages' ]; then
+if [ "$only_action_then_exit" = 'download-packages' ]; then
   if [ "$debug_output" = 'true' ]; then
     ls -l --all --human-readable --group-directories-first --color="$colorful_ls" "$downloaded_packages"
   fi
   case "$output_format" in
     directory)
-      print_message 'debug' "moving all .deb files from '$downloaded_packages' to '$output_directory'"
+      print_message 'debug' "moving all packages from '$downloaded_packages' to '$output_directory'"
       mv "$downloaded_packages/"*.deb "$output_directory"
       ;;
     tarball)
       echo 'Creating tarball ...'
       pushd "$downloaded_packages" > /dev/null
       print_message 'debug' "creating tarball '$workspace/$output_file_name.tar'"
-      tar --create --file="$workspace/$output_file_name.tar" *.deb
+      if ! tar --create --file="$workspace/$output_file_name.tar" *.deb; then
+        print_message 'error' "failed to create tarball '$workspace/$output_file_name.tar'"
+        exit 1
+      fi
       popd > /dev/null
       print_message 'debug' "moving '$workspace/$output_file_name.tar' to '$output_directory'"
       mv "$workspace/$output_file_name.tar" "$output_directory"
@@ -1926,7 +1844,7 @@ mkdir "$initial_packages"
 
 case "$packages_to_extract" in
   all-packages)
-    print_message 'debug' "moving all .deb files from '$downloaded_packages' to '$initial_packages'"
+    print_message 'debug' "moving all packages from '$downloaded_packages' to '$initial_packages'"
     mv "$downloaded_packages/"*.deb "$initial_packages"
     ;;
   essential-packages)
@@ -1945,17 +1863,17 @@ case "$packages_to_extract" in
     done
     declare -a initial_essential_subset=($(awk '/\nEssential: yes\n/' RS='' ORS='\n\n' "$workspace/primary_package_list" | sed --quiet --expression 's/^Package: *//p'))
     if [ "$mawk_present" = 'true' ]; then
-      declare -a include_essentials+=('mawk')
+      declare -a packages_to_consider_essential+=('mawk')
     elif [ "$original_awk_present" = 'true' ]; then
-      declare -a include_essentials+=('original-awk')
+      declare -a packages_to_consider_essential+=('original-awk')
     elif [ "$gawk_present" = 'true' ]; then
-      declare -a include_essentials+=('gawk')
+      declare -a packages_to_consider_essential+=('gawk')
     else
       print_message 'error' "no packages that provide 'awk' were present."
       exit 1
     fi
-    declare -a include_essentials=($(echo "${include_essentials[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-    for included in "${include_essentials[@]}"; do
+    declare -a packages_to_consider_essential=($(echo "${packages_to_consider_essential[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
+    for included in "${packages_to_consider_essential[@]}"; do
       for package in "${initial_essential_subset[@]}"; do
         if [ "$package" = "$included" ]; then
           declare package_is_present='true'
@@ -1969,9 +1887,9 @@ case "$packages_to_extract" in
       unset package_is_present
     done
     declare -a initial_essential_subset=($(echo "${initial_essential_subset[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-    if [ "${#exclude_essentials[@]}" != '0' ]; then
-      declare -a exclude_essentials=($(echo "${exclude_essentials[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-      for excluded in "${exclude_essentials[@]}"; do
+    if [ "${#packages_to_consider_non_essential[@]}" != '0' ]; then
+      declare -a packages_to_consider_non_essential=($(echo "${packages_to_consider_non_essential[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
+      for excluded in "${packages_to_consider_non_essential[@]}"; do
         for key in "${!initial_essential_subset[@]}"; do
           if [ "$excluded" = "${initial_essential_subset[key]}" ]; then
             declare package_is_present='true'
@@ -1990,19 +1908,38 @@ case "$packages_to_extract" in
     let counter='0'
     until [ "${#initial_essential_subset[@]}" = '0' ]; do
       for key in "${!initial_essential_subset[@]}"; do
-        if [ -z "$(cat "$workspace/current-package-fields" | grep --regexp="^Package: ${initial_essential_subset[key]}$")" ]; then
-          unset initial_essential_subset[key]
-        else
-          for package in "${packages_to_forbid[@]}"; do
-            if [ "$package" = "${initial_essential_subset[key]}" ]; then
-              print_message 'debug' "essential ignored '${initial_essential_subset[key]}'"
+        case "${initial_essential_subset[key]}" in
+          'perl:any')
+            print_message 'debug' "choosing 'perl' over '${initial_essential_subset[key]}'"
+            unset initial_essential_subset[key]
+            declare -a initial_essential_subset+=('perl')
+            ;;
+          'perlapi-'*)
+            print_message 'debug' "choosing 'perl-base' over '${initial_essential_subset[key]}'"
+            unset initial_essential_subset[key]
+            declare -a initial_essential_subset+=('perl-base')
+            ;;
+#          'python3:any')
+#            print_message 'debug' "choosing 'python3' over '${initial_essential_subset[key]}'"
+#            unset initial_essential_subset[key]
+#            declare -a initial_essential_subset+=('python3')
+#            ;;
+          *)
+            if [ -z "$(cat "$workspace/current-package-fields" | grep --regexp="^Package: ${initial_essential_subset[key]}$")" ]; then
+              print_message 'debug' "ignoring essential package '${initial_essential_subset[key]}'"
               unset initial_essential_subset[key]
             fi
-          done
-        fi
+            ;;
+        esac
+        for package in "${packages_to_forbid[@]}"; do
+          if [ "$package" = "${initial_essential_subset[key]}" ]; then
+            print_message 'debug' "ignoring essential package '${initial_essential_subset[key]}'"
+            unset initial_essential_subset[key]
+          fi
+        done
       done
       declare -a pseudo_essential_subset=($(echo "${pseudo_essential_subset[@]} ${initial_essential_subset[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-      print_message 'debug' "iteration $counter, ${#initial_essential_subset[@]} packages."
+      print_message 'debug' "iteration '$counter', amount of packages: '${#initial_essential_subset[@]}'"
       let counter+='1'
       declare -a new_packages=(
         $(
@@ -2049,20 +1986,31 @@ case "$packages_to_extract" in
       done
       unset package_name
       if [ "$package_is_essential" = 'true' ]; then
-        print_message 'debug' "moving essential package '$package' to '$initial_packages'"
+        print_message 'debug' "moving essential package '$(basename "$package")' to '$initial_packages'"
         mv "$package" "$initial_packages"
       else
         if [ ! -d "$remaining_packages" ]; then
           print_message 'debug' "creating temporary directory '$remaining_packages'"
           mkdir "$remaining_packages"
         fi
-        print_message 'debug' "moving non-essential package '$package' to '$remaining_packages'"
+        print_message 'debug' "moving non-essential package '$(basename "$package")' to '$remaining_packages'"
         mv "$package" "$remaining_packages"
       fi
       unset package_is_essential
     done
     ;;
 esac
+
+if [ "$debug_output" = 'true' ]; then
+  declare -a amount_of_packages=("$initial_packages/"*.deb)
+  print_message 'debug' "amount of initial packages:   '${#amount_of_packages[@]}'"
+  unset amount_of_packages
+  if [ -d "$remaining_packages" ]; then
+    declare -a amount_of_packages=("$remaining_packages/"*.deb)
+    print_message 'debug' "amount of remaining packages: '${#amount_of_packages[@]}'"
+    unset amount_of_packages
+  fi
+fi
 
 print_message 'debug' "removing temporary directory '$downloaded_packages'"
 
@@ -2077,9 +2025,16 @@ unset downloaded_packages
 
 print_message 'debug' "extracting all packages in '$initial_packages' with '$extractor'"
 
+let counter='0'
+
 for package in "$initial_packages/"*.deb; do
+  let counter+='1'
   extract_deb_data "$package" "$target" || exit 1
 done
+
+print_message 'debug' "extracted '$counter' packages."
+
+unset counter
 
 ################################################################
 
@@ -2142,23 +2097,25 @@ echo '' > "$target/var/lib/dpkg/status"
 
 echo '' > "$target/var/lib/dpkg/available"
 
+print_message 'debug' "creating default file '$target/etc/fstab'"
+
 echo '# UNCONFIGURED FSTAB FOR BASE SYSTEM' > "$target/etc/fstab"
 
 chown root:root "$target/etc/fstab"
 
 chmod 0644 "$target/etc/fstab"
 
-let counter='0'
-
-for architecture in "${architectures[@]}"; do
-  let counter+='1'
-  if [ "$counter" != '1' ]; then
-    print_message 'debug' "adding architecture '$architecture' to '$target/var/lib/dpkg/arch'"
-    echo "$architecture" >> "$target/var/lib/dpkg/arch"
-  fi
-done
-
-unset counter
+if [ "${#architectures[@]}" != '1' ]; then
+  let counter='0'
+  for architecture in "${architectures[@]}"; do
+    let counter+='1'
+    if [ "$counter" != '1' ]; then
+      print_message 'debug' "adding architecture '$architecture' to '$target/var/lib/dpkg/arch'"
+      echo "$architecture" >> "$target/var/lib/dpkg/arch"
+    fi
+  done
+  unset counter
+fi
 
 ################################################################
 
@@ -2230,7 +2187,7 @@ done
 
 ################################################################
 
-if [ "$only_then_exit" = 'extract-packages' ]; then
+if [ "$only_action_then_exit" = 'extract-packages' ]; then
   if [ "$debug_output" = 'true' ]; then
     ls -l --all --human-readable --group-directories-first --color="$colorful_ls" "$target"
   fi
@@ -2239,7 +2196,10 @@ if [ "$only_then_exit" = 'extract-packages' ]; then
       echo 'Creating tarball ...'
       pushd "$target" > /dev/null
       print_message 'debug' "creating tarball '$workspace/$output_file_name.tar'"
-      tar --create --file="$workspace/$output_file_name.tar" *
+      if ! tar --create --file="$workspace/$output_file_name.tar" *; then
+        print_message 'error' "failed to create tarball '$workspace/$output_file_name.tar'"
+        exit 1
+      fi
       popd > /dev/null
       print_message 'debug' "moving '$workspace/$output_file_name.tar' to '$output_directory'"
       mv "$workspace/$output_file_name.tar" "$output_directory"
@@ -2311,7 +2271,7 @@ export TERM='$term_env_var'
 export PATH
 export DEBIAN_FRONTEND='$(if [ "$interactive_bootstrap" = 'true' ]; then echo 'teletype'; else echo 'noninteractive'; fi)'
 export DEBCONF_NONINTERACTIVE_SEEN='$debconf_noninteractive_seen'
-export DEBCONF_NOWARNINGS='$debconf_nowarnings'
+export DEBCONF_NOWARNINGS='$(if [ "$debug_output" = 'true' ]; then echo 'no'; else echo 'yes'; fi)'
 export DPKG_COLORS='$colorful_dpkg'
 
 cd '$(echo "$initial_packages" | sed --expression "s#$target##")'
@@ -2355,7 +2315,7 @@ export TERM='$term_env_var'
 export PATH
 export DEBIAN_FRONTEND='$debian_frontend'
 export DEBCONF_NONINTERACTIVE_SEEN='$debconf_noninteractive_seen'
-export DEBCONF_NOWARNINGS='$debconf_nowarnings'
+export DEBCONF_NOWARNINGS='$(if [ "$debug_output" = 'true' ]; then echo 'no'; else echo 'yes'; fi)'
 export DPKG_COLORS='$colorful_dpkg'
 
 cd '$(echo "$remaining_packages" | sed --expression "s#$target##")'
@@ -2385,7 +2345,7 @@ export HOME='/root'
 export TERM='$term_env_var'
 export DEBIAN_FRONTEND='$debian_frontend'
 export DEBCONF_NONINTERACTIVE_SEEN='$debconf_noninteractive_seen'
-export DEBCONF_NOWARNINGS='$debconf_nowarnings'
+export DEBCONF_NOWARNINGS='$(if [ "$debug_output" = 'true' ]; then echo 'no'; else echo 'yes'; fi)'
 export DPKG_COLORS='$colorful_dpkg'
 
 apt-get \
@@ -2395,7 +2355,7 @@ apt-get \
 apt-get \
   --option APT::Color='$colorful_apt' \
   --option APT::Get::Assume-Yes='$apt_assume_yes' \
-  --option APT::Install-Recommends='false' \
+  --option APT::Install-Recommends='$install_recommends' \
   --option APT::Install-Suggests='false' \
   install $(echo "${packages_to_install[@]}")
 "
@@ -2437,13 +2397,6 @@ fi
 
 unmount_virtual_kernel_file_systems "$target" || exit 1
 
-if [ "$keep_packages_directory" = 'true' ]; then
-  print_message 'debug' "not removing directory '$all_packages'"
-else
-  print_message 'debug' "removing temporary directory '$all_packages'"
-  rm --recursive "$all_packages"
-fi
-
 print_message 'debug' "removing temporary file '$target/usr/sbin/policy-rc.d'"
 
 rm --force "$target/usr/sbin/policy-rc.d"
@@ -2463,6 +2416,36 @@ rm --force "$target/etc/resolv.conf"
 print_message 'debug' "removing temporary file '$target/etc/hostname'"
 
 rm --force "$target/etc/hostname"
+
+################################################################
+
+if [ "$keep_packages_directory" = 'true' ]; then
+  print_message 'debug' "not removing directory '$all_packages'"
+else
+  print_message 'debug' "removing temporary directory '$all_packages'"
+  rm --recursive "$all_packages"
+fi
+
+print_message 'debug' "creating default file '$target/etc/hostname' with hostname '$hostname'"
+
+echo "$hostname" > "$target/etc/hostname"
+
+print_message 'debug' "creating default file '$target/etc/hosts' with hostname '$hostname'"
+
+cat << end_of_file > "$target/etc/hosts"
+127.0.0.1  localhost
+127.0.1.1  $hostname.localdomain  $hostname
+::1        localhost ip6-localhost ip6-loopback
+ff02::1    ip6-allnodes
+ff02::2    ip6-allrouters
+end_of_file
+
+if [ -f "$target/etc/machine-id" ]; then
+  print_message 'debug' "removing file '$target/etc/machine-id'"
+  rm --force "$target/etc/machine-id"
+  print_message 'debug' "creating default file '$target/etc/machine-id' with value 'uninitialized'"
+  echo 'uninitialized' > "$target/etc/machine-id"
+fi
 
 ################################################################
 
@@ -2494,7 +2477,10 @@ case "$output_format" in
     echo 'Creating tarball ...'
     pushd "$target" > /dev/null
     print_message 'debug' "creating tarball '$workspace/$output_file_name.tar'"
-    tar --create --file="$workspace/$output_file_name.tar" *
+    if ! tar --create --file="$workspace/$output_file_name.tar" *; then
+      print_message 'error' "failed to create tarball '$workspace/$output_file_name.tar'"
+      exit 1
+    fi
     popd > /dev/null
     print_message 'debug' "moving '$workspace/$output_file_name.tar' to '$output_directory'"
     mv "$workspace/$output_file_name.tar" "$output_directory"

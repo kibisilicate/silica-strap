@@ -1,11 +1,5 @@
 #! /usr/bin/env bash
 
-function print_usage_message {
-  cat << 'usage_message'
-Place holder.
-usage_message
-}
-
 function mount_virtual_kernel_file_systems {
   print_message 'debug' "bind mounting '/dev' to '$1/dev'"
   if ! mount --bind /dev "$1/dev"; then
@@ -81,18 +75,12 @@ function unmount_virtual_kernel_file_systems {
 }
 
 function clean_up {
-  if [ -d "$workspace" ]; then
+  if [ -n "$workspace" ] && [ -d "$workspace" ]; then
     if [ -n "$environment" ] && [ -d "$environment" ]; then
-      if ! unmount_virtual_kernel_file_systems "$environment"; then
-        print_message 'error' "not removing directory '$workspace' while file systems are still mounted."
-        exit 1
-      fi
+      unmount_virtual_kernel_file_systems "$environment" || exit 1
     fi
     if [ -n "$target" ] && [ -d "$target" ]; then
-      if ! unmount_virtual_kernel_file_systems "$target"; then
-        print_message 'error' "not removing directory '$workspace' while file systems are still mounted."
-        exit 1
-      fi
+      unmount_virtual_kernel_file_systems "$target" || exit 1
     fi
     if [ "$keep_workspace_directory" = 'true' ]; then
       print_message 'warning' "as requested, not removing workspace '$workspace'"
@@ -140,37 +128,6 @@ function fetch_package_list {
     return 1
   fi
 }
-
-<< '#block_comment'
-
-function compress_and_move_output_file {
-  echo 'Compressing ...'
-  print_message 'debug' "compressing '$1' with '$output_compression'"
-  case "$output_compression" in
-    'bzip2')
-      bzip2 --compress --force --quiet "$1"
-      print_message 'debug' "moving '$1.bz2' to '$2'"
-      mv "$1.bz2" "$2"
-      ;;
-    'gzip')
-      gzip --force --quiet "$1"
-      print_message 'debug' "moving '$1.gz' to '$2'"
-      mv "$1.gz" "$2"
-      ;;
-    'xz')
-      xz --compress --force --quiet "$1"
-      print_message 'debug' "moving '$1.xz' to '$2'"
-      mv "$1.xz" "$2"
-      ;;
-    'zstd')
-      zstd --compress --rm --force --quiet "$1"
-      print_message 'debug' "moving '$1.zst' to '$2'"
-      mv "$1.zst" "$2"
-      ;;
-  esac
-}
-
-#block_comment
 
 function extract_deb_field {
   case "$extractor" in
