@@ -16,15 +16,15 @@ silica-strap was created as an alternative to debootstrap and mmdebstrap.
 Clone the repository and enter directory.
 
 ```
-git clone https://github.com/silica-dev/silica-strap
+# git clone https://github.com/silica-dev/silica-strap
 
-cd ./silica-strap
+# cd ./silica-strap
 ```
 
 Run the install script with sudo or as root.
 
 ```
-sudo ./scripts/install.sh
+# ./scripts/install.sh
 ```
 
 ## Usage
