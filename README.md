@@ -1,10 +1,15 @@
 # silica-strap
 
-silica-strap is an alternative to debootstrap and mmdebstrap.
+silica-strap bootstraps a Debian system using one or more suites, components, architectures, and mirrors.
+It can resolve simple dependencies itself and more complex dependencies using apt inside its internal environment.
 
-It can resolve simple dependencies internally and more complex dependencies using apt inside an internal environment.
+silica-strap can be used to create a base Debian installation or a Debian chroot environment.
 
-It can run on any GNU + Linux distribution and use multiple mirrors, suites, components, and architectures.
+On first run, silica-strap will bootstrap a small (less than 150MB) internal environment to provide itself a copy of apt and dpkg.
+This prevents the hosts apt and dpkg from influencing the result of the bootstrap.
+This also gives silica-strap the ability to run on any GNU + Linux distribution, not just Debian, Ubuntu, and their derivatives.
+
+silica-strap was created as an alternative to debootstrap and mmdebstrap.
 
 ## Installation
 
@@ -27,24 +32,26 @@ sudo ./scripts/install.sh
 Basic silica-strap usage:
 
 ```
-sudo silica-strap -r unstable -o /mnt
+# silica-strap -r=unstable -o=/mnt
 ```
 
 Using the internal dependency resolver:
 
 ```
-sudo silica-strap -r unstable -R internal -o /mnt
+# silica-strap -r=unstable -R=internal -o=/mnt
 ```
 
-Outputting to a tarball:
+Output to a tarball:
 
 ```
-sudo silica-strap -r unstable -f tarball -o ./debian-unstable.tar
+# silica-strap -r=unstable -o=./debian-unstable.tar
 ```
 
-Creating a buildd chroot:
+Create a buildd chroot:
 
 ```
-sudo silica-strap -r unstable -v buildd -o /mnt
+# mkdir -v ./debian-buildd-chroot
+
+# silica-strap -r=unstable -v=buildd -o=./debian-buildd-chroot
 ```
 
