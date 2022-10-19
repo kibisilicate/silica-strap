@@ -1,0 +1,3 @@
+silica-strap usr/bin
+functions usr/share/silica-strap
+releases usr/share/silica-strap

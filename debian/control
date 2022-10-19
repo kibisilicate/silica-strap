@@ -1,0 +1,33 @@
+Source: silica-strap
+Section: admin
+Priority: optional
+Maintainer: Steve Panagaea <>
+Standards-Version: 4.6.1
+Rules-Requires-Root: no
+Build-Depends: debhelper-compat (= 13)
+Vcs-Git: https://github.com/kibisilicate/silica-strap.git
+Vcs-Browser: https://github.com/kibisilicate/silica-strap
+
+Package: silica-strap
+Architecture: all
+Depends: binutils,
+         gzip,
+         mount,
+         wget,
+         xz-utils
+Recommends: arch-test,
+            binfmt-support,
+            bzip2,
+            curl,
+            qemu-user-static,
+            sudo,
+            zstd
+Suggests: debootstrap,
+          mmdebstrap
+Description: Bootstrap overly complicated Debian systems.
+ silica-strap bootstraps a Debian system using one or more suites, components,
+ architectures, and mirrors. It can resolve simple dependencies itself and more
+ complex dependencies using apt inside its internal environment.
+ .
+ silica-strap can be used to create a base Debian installation or a Debian
+ chroot environment.
