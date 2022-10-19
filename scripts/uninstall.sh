@@ -1,12 +1,12 @@
 #! /usr/bin/env bash
 
 if [ "$(whoami)" != 'root' ]; then
-  echo "error: uninstall.sh must be ran as root."
+  echo "error: $0 must be ran as root."
   exit 1
 fi
 
-if [ -L '/usr/bin/silica-strap' ]; then
-  echo "removing symlink '/usr/bin/silica-strap'"
+if [ -e '/usr/bin/silica-strap' ]; then
+  echo "removing file '/usr/bin/silica-strap'"
   rm '/usr/bin/silica-strap'
 fi
 

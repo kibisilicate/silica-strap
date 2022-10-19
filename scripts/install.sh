@@ -1,7 +1,7 @@
 #! /usr/bin/env bash
 
 if [ "$(whoami)" != 'root' ]; then
-  echo "error: install.sh must be ran as root."
+  echo "error: $0 must be ran as root."
   exit 1
 fi
 
@@ -20,8 +20,8 @@ if [ ! -f "$(pwd)/releases" ]; then
   exit 1
 fi
 
-if [ -L '/usr/bin/silica-strap' ]; then
-  echo "removing existing symlink '/usr/bin/silica-strap'"
+if [ -e '/usr/bin/silica-strap' ]; then
+  echo "removing existing file '/usr/bin/silica-strap'"
   rm '/usr/bin/silica-strap'
 fi
 
@@ -30,14 +30,10 @@ if [ -d '/usr/share/silica-strap' ]; then
   rm --recursive '/usr/share/silica-strap'
 fi
 
+cp --verbose "$(pwd)/silica-strap" '/usr/bin/silica-strap'
+
 mkdir --verbose '/usr/share/silica-strap'
-
-cp --verbose "$(pwd)/silica-strap" '/usr/share/silica-strap'
-
-chmod --verbose +x '/usr/share/silica-strap/silica-strap'
 
 cp --verbose "$(pwd)/functions" '/usr/share/silica-strap'
 
 cp --verbose "$(pwd)/releases" '/usr/share/silica-strap'
-
-ln --verbose --symbolic '/usr/share/silica-strap/silica-strap' '/usr/bin/silica-strap'
