@@ -1331,29 +1331,10 @@ if [ "${#packages_to_include[@]}" != '0' ]; then
   declare -a initial_package_set=($(echo "${initial_package_set[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
 fi
 
-#if [ "${#packages_to_forbid[@]}" != '0' ]; then
-#  declare -a packages_to_forbid=($(echo "${packages_to_forbid[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-#  print_message 'debug' "creating temporary file '$workspace/99-silica-strap-prefs'"
-#  let counter='0'
-#  for package in "${packages_to_forbid[@]}"; do
-#    let counter+='1'
-#    if [ "$counter" != '1' ]; then
-#      echo '' >> "$workspace/99-silica-strap-prefs"
-#    fi
-#    cat << preferences >> "$workspace/99-silica-strap-prefs"
-#Package: $package
-#Pin: release *
-#Pin-Priority: -10
-#preferences
-#  done
-#  unset counter
-#  declare -a packages_to_exclude+=(${packages_to_forbid[@]})
-#fi
-
 if [ "${#packages_to_forbid[@]}" != '0' ]; then
   declare -a packages_to_forbid=($(echo "${packages_to_forbid[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-  print_message 'debug' "creating temporary file '$workspace/99-silica-strap-prefs'"
-  cat << preferences >> "$workspace/99-silica-strap-prefs"
+  print_message 'debug' "creating temporary file '$workspace/99-forbidden-packages'"
+  cat << preferences >> "$workspace/99-forbidden-packages"
 Package: ${packages_to_forbid[@]}
 Pin: release *
 Pin-Priority: -10
@@ -1396,9 +1377,9 @@ esac
 
 case "$resolver" in
   'apt')
-    if [ -f "$workspace/99-silica-strap-prefs" ]; then
-      print_message 'debug' "copying '$workspace/99-silica-strap-prefs' to '$environment/etc/apt/preferences.d/99-silica-strap-prefs'"
-      cp "$workspace/99-silica-strap-prefs" "$environment/etc/apt/preferences.d/99-silica-strap-prefs"
+    if [ -f "$workspace/99-forbidden-packages" ]; then
+      print_message 'debug' "copying '$workspace/99-forbidden-packages' to '$environment/etc/apt/preferences.d/99-forbidden-packages'"
+      cp "$workspace/99-forbidden-packages" "$environment/etc/apt/preferences.d/99-forbidden-packages"
     fi
     print_message 'debug' 'running apt inside the environment to calculate dependencies.'
     declare apt_results="$(
@@ -1419,9 +1400,9 @@ apt-get \
   install $(echo "${initial_package_set[@]}")
 " 2> /dev/stdout
     )"
-    if [ -f "$environment/etc/apt/preferences.d/99-silica-strap-prefs" ]; then
-      print_message 'debug' "removing temporary file '$environment/etc/apt/preferences.d/99-silica-strap-prefs'"
-      rm "$environment/etc/apt/preferences.d/99-silica-strap-prefs"
+    if [ -f "$environment/etc/apt/preferences.d/99-forbidden-packages" ]; then
+      print_message 'debug' "removing temporary file '$environment/etc/apt/preferences.d/99-forbidden-packages'"
+      rm "$environment/etc/apt/preferences.d/99-forbidden-packages"
     fi
     declare -a target_package_set=(
       $(
@@ -2330,9 +2311,9 @@ fi
 
 ################################################################
 
-if [ -f "$workspace/99-silica-strap-prefs" ]; then
-  print_message 'debug' "copying '$workspace/99-silica-strap-prefs' to '$target/etc/apt/preferences.d/99-silica-strap-prefs'"
-  cp "$workspace/99-silica-strap-prefs" "$target/etc/apt/preferences.d/99-silica-strap-prefs"
+if [ -f "$workspace/99-forbidden-packages" ]; then
+  print_message 'debug' "copying '$workspace/99-forbidden-packages' to '$target/etc/apt/preferences.d/99-forbidden-packages'"
+  cp "$workspace/99-forbidden-packages" "$target/etc/apt/preferences.d/99-forbidden-packages"
 fi
 
 ################################################################
@@ -2384,12 +2365,12 @@ done
 
 ################################################################
 
-if [ -f "$target/etc/apt/preferences.d/99-silica-strap-prefs" ]; then
+if [ -f "$target/etc/apt/preferences.d/99-forbidden-packages" ]; then
   if [ "$keep_apt_preferences" = 'true' ]; then
-    print_message 'debug' "not removing file '$target/etc/apt/preferences.d/99-silica-strap-prefs'"
+    print_message 'debug' "not removing file '$target/etc/apt/preferences.d/99-forbidden-packages'"
   else
-    print_message 'debug' "removing temporary file '$target/etc/apt/preferences.d/99-silica-strap-prefs'"
-    rm --force "$target/etc/apt/preferences.d/99-silica-strap-prefs"
+    print_message 'debug' "removing temporary file '$target/etc/apt/preferences.d/99-forbidden-packages'"
+    rm --force "$target/etc/apt/preferences.d/99-forbidden-packages"
   fi
 fi
 
@@ -2488,3 +2469,4 @@ case "$output_format" in
 esac
 
 echo 'Base system install complete.'
+
