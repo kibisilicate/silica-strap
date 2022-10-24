@@ -431,34 +431,6 @@ unset chosen_output_location
 
 print_message 'debug' "output directory:     '$output_directory'"
 
-let counter='0'
-
-for item in $(tree -a -i -L 1 -n --noreport "$output_directory" | sed --expression "s/ /\"space\"/g"); do
-  let counter+='1'
-  if [ "$counter" != '1' ]; then
-    declare -a output_directory_contents+=("$(echo "$item" | sed --expression "s/\"space\"/ /g")")
-  fi
-done
-
-unset counter
-
-if [ "${#output_directory_contents[@]}" = '0' ]; then
-  print_message 'debug' 'output directory is empty.'
-else
-  for item in "${output_directory_contents[@]}"; do
-    case "$item" in
-      'boot' | 'efi' | 'lost+found') ;;
-
-      *)
-        print_message 'error' 'unrecognized output directory contents.'
-        exit 1
-        ;;
-    esac
-  done
-fi
-
-unset output_directory_contents
-
 ################################################################
 
 if [ -z "$chosen_output_format" ]; then
@@ -490,6 +462,30 @@ if [ "$implied_format" != 'directory' ]; then
 fi
 
 unset implied_format
+
+if [ "$output_format" = 'directory' ]; then
+  let counter='0'
+  for item in $(tree -a -i -L 1 -n --noreport "$output_directory" | sed --expression "s/ /\"space\"/g"); do
+    let counter+='1'
+    if [ "$counter" != '1' ]; then
+      declare -a output_directory_contents+=("$(echo "$item" | sed --expression "s/\"space\"/ /g")")
+    fi
+  done
+  unset counter
+  if [ "${#output_directory_contents[@]}" != '0' ]; then
+    for item in "${output_directory_contents[@]}"; do
+      case "$item" in
+        'boot' | 'efi' | 'lost+found') ;;
+
+        *)
+          print_message 'error' 'unrecognized output directory contents.'
+          exit 1
+          ;;
+      esac
+    done
+  fi
+  unset output_directory_contents
+fi
 
 ################################################################
 
