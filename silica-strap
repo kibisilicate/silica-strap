@@ -295,14 +295,8 @@ for argument in "${provided_arguments[@]}"; do
     --include-recommends)
       declare include_recommends='true'
       ;;
-    --no-include-recommends)
+    --exclude-recommends)
       declare include_recommends='false'
-      ;;
-    --install-recommends)
-      declare install_recommends='true'
-      ;;
-    --no-install-recommends)
-      declare install_recommends='false'
       ;;
     --interactive)
       declare interactive_bootstrap='true'
@@ -928,12 +922,6 @@ if [ "$resolver" != 'apt' ] && [ "$include_recommends" = 'true' ]; then
   print_message 'error' "only the resolver 'apt' supports --include-recommends"
   exit 1
 fi
-
-if [ -z "$install_recommends" ]; then
-  declare install_recommends='true'
-fi
-
-print_message 'debug' "install recommends: '$install_recommends'"
 
 ################################################################
 
@@ -2311,7 +2299,7 @@ apt-get \
 apt-get \
   --option APT::Color='$colorful_apt' \
   --option APT::Get::Assume-Yes='$apt_assume_yes' \
-  --option APT::Install-Recommends='$install_recommends' \
+  --option APT::Install-Recommends='false' \
   --option APT::Install-Suggests='false' \
   install $(echo "${packages_to_install[@]}")
 "
