@@ -286,18 +286,6 @@ for argument in "${provided_arguments[@]}"; do
     -H=* | --hostname=*)
       declare chosen_hostname="${argument#*=}"
       ;;
-    --force-only-bash)
-      declare -a force_configuration+=('only-bash')
-      ;;
-    --force-only-gawk)
-      declare -a force_configuration+=('only-gawk')
-      ;;
-    --force-only-mawk)
-      declare -a force_configuration+=('only-mawk')
-      ;;
-    --force-only-original-awk)
-      declare -a force_configuration+=('only-original-awk')
-      ;;
     --merged-usr) # see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
       declare merged_usr_type='aliased-dirs'
       ;;
@@ -913,43 +901,6 @@ else
 fi
 
 unset chosen_hostname
-
-################################################################
-
-if [ "${#force_configuration[@]}" != '0' ]; then
-  declare -a force_configuration=($(echo "${force_configuration[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-  let awk_counter='0'
-  for configuration in "${force_configuration[@]}"; do
-    case "$configuration" in
-      only-bash)
-        declare -a packages_to_include+=('bash')
-        declare -a packages_to_forbid+=('dash')
-        ;;
-      only-gawk)
-        let awk_counter+='1'
-        declare -a packages_to_include+=('gawk')
-        declare -a packages_to_forbid+=('mawk' 'original-awk')
-        ;;
-      only-mawk)
-        let awk_counter+='1'
-        declare -a packages_to_include+=('mawk')
-        declare -a packages_to_forbid+=('gawk' 'original-awk')
-        ;;
-      only-original-awk)
-        let awk_counter+='1'
-        declare -a packages_to_include+=('original-awk')
-        declare -a packages_to_forbid+=('gawk' 'mawk')
-        ;;
-    esac
-  done
-  if (("$awk_counter" > 1)); then
-    print_message 'error' "only a single provider of 'awk' can be forced at a time."
-    exit 1
-  fi
-  unset awk_counter
-fi
-
-unset force_configuration
 
 ################################################################
 
