@@ -274,14 +274,8 @@ for argument in "${provided_arguments[@]}"; do
     --consider-non-essential=*)
       declare -a packages_to_consider_non_essential+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    'ftp://'*)
-      declare -a chosen_mirrors+=("$argument")
-      ;;
-    'http://'*)
-      declare -a chosen_mirrors+=("$argument")
-      ;;
-    'https://'*)
-      declare -a chosen_mirrors+=("$argument")
+    -m=* | --mirror=* | --mirrors=*)
+      declare -a chosen_mirrors+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
     -H=* | --hostname=*)
       declare chosen_hostname="${argument#*=}"
