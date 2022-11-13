@@ -247,9 +247,6 @@ for argument in "${provided_arguments[@]}"; do
     -e=* | --exclude=*)
       declare -a packages_to_exclude+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    -I=* | --install=*)
-      declare -a packages_to_install+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
     -P=* | --prohibit=*)
       declare -a packages_to_prohibit+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
@@ -974,7 +971,6 @@ print_message 'debug' "output file name:     '$output_file_name'"
 ################################################################
 
 print_message 'debug' "# of packages to include:  '${#packages_to_include[@]}'"
-print_message 'debug' "# of packages to install:  '${#packages_to_install[@]}'"
 print_message 'debug' "# of packages to exclude:  '${#packages_to_exclude[@]}'"
 print_message 'debug' "# of packages to prohibit: '${#packages_to_prohibit[@]}'"
 print_message 'debug' "# of environment hooks:    '${#environment_hooks[@]}'"
@@ -2271,32 +2267,6 @@ fi
 if [ -f "$workspace/99-prohibited-packages" ]; then
   print_message 'debug' "copying '$workspace/99-prohibited-packages' to '$target/etc/apt/preferences.d/99-prohibited-packages'"
   cp "$workspace/99-prohibited-packages" "$target/etc/apt/preferences.d/99-prohibited-packages"
-fi
-
-################################################################
-
-if [ "${#packages_to_install[@]}" != '0' ]; then
-  print_message 'debug' 'downloading and installing chosen packages.'
-  declare -a packages_to_install=($(echo "${packages_to_install[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-  chroot "$target" /usr/bin/env --ignore-environment bash -c "
-export HOME='/root'
-export TERM='$term_env_var'
-export DEBIAN_FRONTEND='$debian_frontend'
-export DEBCONF_NONINTERACTIVE_SEEN='$debconf_noninteractive_seen'
-export DEBCONF_NOWARNINGS='$(if [ "$debug_output" = 'true' ]; then echo 'no'; else echo 'yes'; fi)'
-export DPKG_COLORS='$colorful_dpkg'
-
-apt-get \
-  --option APT::Color='$colorful_apt' \
-  update
-
-apt-get \
-  --option APT::Color='$colorful_apt' \
-  --option APT::Get::Assume-Yes='$apt_assume_yes' \
-  --option APT::Install-Recommends='false' \
-  --option APT::Install-Suggests='false' \
-  install $(echo "${packages_to_install[@]}")
-"
 fi
 
 ################################################################
