@@ -99,31 +99,7 @@ esac
 
 function print_message {
   case "$1" in
-    error)
-      case "$colorful_output" in
-        always)
-          echo -e -n "\033[01;31merror\033[00m: "
-          echo "$2"
-          ;;
-        never)
-          echo -n "error: "
-          echo "$2"
-          ;;
-      esac > /dev/stderr
-      ;;
-    warning)
-      case "$colorful_output" in
-        always)
-          echo -e -n "\033[01;33mwarning\033[00m: "
-          echo "$2"
-          ;;
-        never)
-          echo -n "warning: "
-          echo "$2"
-          ;;
-      esac > /dev/stderr
-      ;;
-    debug)
+    'debug')
       if [ "$debug_output" = 'true' ]; then
         case "$colorful_output" in
           always)
@@ -136,6 +112,42 @@ function print_message {
             ;;
         esac
       fi
+      ;;
+    'info')
+      case "$colorful_output" in
+        always)
+          echo -e -n "\033[01;32minfo\033[00m: "
+          echo "$2"
+          ;;
+        never)
+          echo -n "info: "
+          echo "$2"
+          ;;
+      esac
+      ;;
+    'warning')
+      case "$colorful_output" in
+        always)
+          echo -e -n "\033[01;33mwarning\033[00m: "
+          echo "$2"
+          ;;
+        never)
+          echo -n "warning: "
+          echo "$2"
+          ;;
+      esac > /dev/stderr
+      ;;
+    'error')
+      case "$colorful_output" in
+        always)
+          echo -e -n "\033[01;31merror\033[00m: "
+          echo "$2"
+          ;;
+        never)
+          echo -n "error: "
+          echo "$2"
+          ;;
+      esac > /dev/stderr
       ;;
   esac
 }
@@ -183,7 +195,7 @@ fi
 
 ################################################################
 
-print_message 'debug' "silica-strap version:   '$version'"
+print_message 'debug' "silica-strap version:                    '$version'"
 
 if [ -z "$SILICA_STRAP_DIRECTORY" ]; then
   declare silica_strap_directory='/usr/share/silica-strap'
@@ -191,7 +203,7 @@ else
   declare silica_strap_directory="$(realpath "$SILICA_STRAP_DIRECTORY")"
 fi
 
-print_message 'debug' "silica-strap directory: '$silica_strap_directory'"
+print_message 'debug' "silica-strap directory:                  '$silica_strap_directory'"
 
 if [ ! -d "$silica_strap_directory" ]; then
   print_message 'error' "directory '$silica_strap_directory' does not exist."
@@ -363,7 +375,7 @@ case "$only_action_then_exit" in
 esac
 
 if [ "$discard_output" = 'true' ]; then
-  print_message 'debug' 'ignoring any provided output location.'
+  print_message 'info' 'ignoring any provided output location.'
   declare implied_format='directory'
   declare output_directory="$workspace/output"
 elif [ -z "$chosen_output_location" ]; then
@@ -399,7 +411,7 @@ fi
 
 unset chosen_output_location
 
-print_message 'debug' "output directory:     '$output_directory'"
+print_message 'debug' "output directory:                        '$output_directory'"
 
 ################################################################
 
@@ -422,7 +434,7 @@ esac
 
 unset chosen_output_format
 
-print_message 'debug' "output format:        '$output_format'"
+print_message 'debug' "output format:                           '$output_format'"
 
 if [ "$implied_format" != 'directory' ]; then
   if [ "$output_format" != "$implied_format" ]; then
@@ -469,7 +481,7 @@ if ! check_primary_suite "${suites[0]}"; then
   exit 1
 fi
 
-print_message 'debug' "suite(s):             $(for suite in "${suites[@]}"; do echo -n "'$suite'"; done | sed --expression "s/''/' '/g")"
+print_message 'debug' "suite(s):                                $(for suite in "${suites[@]}"; do echo -n "'$suite'"; done | sed --expression "s/''/' '/g")"
 
 ################################################################
 
@@ -477,7 +489,7 @@ if [ "${#components[@]}" = '0' ]; then
   declare -a components=('main')
 fi
 
-print_message 'debug' "component(s):         $(for component in "${components[@]}"; do echo -n "'$component'"; done | sed --expression "s/''/' '/g")"
+print_message 'debug' "component(s):                            $(for component in "${components[@]}"; do echo -n "'$component'"; done | sed --expression "s/''/' '/g")"
 
 ################################################################
 
@@ -666,7 +678,7 @@ unset sparc64_present
 
 unset x32_present
 
-print_message 'debug' "architecture(s):      $(for architecture in "${architectures[@]}"; do echo -n "'$architecture'"; done | sed --expression "s/''/' '/g")"
+print_message 'debug' "architecture(s):                         $(for architecture in "${architectures[@]}"; do echo -n "'$architecture'"; done | sed --expression "s/''/' '/g")"
 
 if [ "$skip_architecture_check" = 'true' ]; then
   print_message 'debug' 'skipping architecture check.'
@@ -719,9 +731,9 @@ esac
 
 unset chosen_variant
 
-print_message 'debug' "variant:              '$variant'"
+print_message 'debug' "variant:                                 '$variant'"
 
-print_message 'debug' "# of packages in custom set: '${#custom_package_set[@]}'"
+print_message 'debug' "# of packages in custom set:             '${#custom_package_set[@]}'"
 
 if [ "$variant" = 'custom' ]; then
   if [ "${#custom_package_set[@]}" = '0' ]; then
@@ -736,6 +748,10 @@ fi
 for package in $(case_specific_packages "$variant" "${suites[0]}"); do
   declare -a packages_to_include+=("$package")
 done
+
+print_message 'debug' "# of packages to include:                '${#packages_to_include[@]}'"
+print_message 'debug' "# of packages to exclude:                '${#packages_to_exclude[@]}'"
+print_message 'debug' "# of packages to prohibit:               '${#packages_to_prohibit[@]}'"
 
 if [ "$output_format" = 'tarball' ]; then
   if [ -z "$chosen_output_file_name" ]; then
@@ -757,10 +773,7 @@ fi
 
 unset chosen_output_file_name
 
-print_message 'debug' "output file name:     '$output_file_name'"
-print_message 'debug' "# of packages to include:  '${#packages_to_include[@]}'"
-print_message 'debug' "# of packages to exclude:  '${#packages_to_exclude[@]}'"
-print_message 'debug' "# of packages to prohibit: '${#packages_to_prohibit[@]}'"
+print_message 'debug' "output file name:                        '$output_file_name'"
 
 ################################################################
 
@@ -776,7 +789,7 @@ done
 
 unset chosen_mirrors
 
-print_message 'debug' "mirror(s): $(for uri in "${mirrors[@]}"; do echo -n "'$uri'"; done | sed --expression "s/''/' '/g")"
+print_message 'debug' "mirror(s):                               $(for uri in "${mirrors[@]}"; do echo -n "'$uri'"; done | sed --expression "s/''/' '/g")"
 
 ################################################################
 
@@ -802,13 +815,13 @@ esac
 
 unset chosen_resolver
 
-print_message 'debug' "resolver:             '$resolver'"
+print_message 'debug' "resolver:                                '$resolver'"
 
 if [ -z "$include_recommends" ]; then
   declare include_recommends='false'
 fi
 
-print_message 'debug' "include recommends: '$include_recommends'"
+print_message 'debug' "include recommends:                      '$include_recommends'"
 
 if [ "$resolver" != 'apt' ] && [ "$include_recommends" = 'true' ]; then
   print_message 'error' "only the resolver 'apt' supports --include-recommends"
@@ -853,7 +866,7 @@ esac
 
 unset chosen_downloader
 
-print_message 'debug' "downloader:           '$downloader'"
+print_message 'debug' "downloader:                              '$downloader'"
 
 if [ "$downloader" = 'curl' ] && ! command -v curl &> /dev/null; then
   print_message 'error' 'curl is not available on the host.'
@@ -895,7 +908,7 @@ esac
 
 unset chosen_extractor
 
-print_message 'debug' "extractor:            '$extractor'"
+print_message 'debug' "extractor:                               '$extractor'"
 
 if [ "$extractor" = 'host-dpkg-deb' ] && ! command -v dpkg-deb &> /dev/null; then
   print_message 'error' 'dpkg-deb is not available on the host.'
@@ -906,7 +919,7 @@ if [ -z "$packages_to_extract" ]; then
   declare packages_to_extract='essential-packages'
 fi
 
-print_message 'debug' "packages to extract: '$packages_to_extract'"
+print_message 'debug' "packages to extract:                     '$packages_to_extract'"
 
 print_message 'debug' "# of packages to consider essential:     '${#packages_to_consider_essential[@]}'"
 
@@ -924,7 +937,7 @@ if [ "$merged_usr_type" = 'none' ]; then
   declare -a packages_to_prohibit+=('usrmerge')
 fi
 
-print_message 'debug' "merged /usr type: '$merged_usr_type'"
+print_message 'debug' "merged /usr type:                        '$merged_usr_type'"
 
 ################################################################
 
@@ -932,7 +945,7 @@ if [ -z "$interactive_bootstrap" ]; then
   declare interactive_bootstrap='false'
 fi
 
-print_message 'debug' "interactive bootstrap: '$interactive_bootstrap'"
+print_message 'debug' "interactive bootstrap:                   '$interactive_bootstrap'"
 
 if [ "$assume_user_input" = 'assume-yes' ] && [ "$interactive_bootstrap" = 'true' ]; then
   print_message 'error' '--assume-yes and --interactive are mutually exclusive.'
@@ -954,12 +967,12 @@ esac
 
 ################################################################
 
-print_message 'debug' "# of environment hooks:    '${#environment_hooks[@]}'"
-print_message 'debug' "# of download hooks:       '${#download_hooks[@]}'"
-print_message 'debug' "# of extract hooks:        '${#extract_hooks[@]}'"
-print_message 'debug' "# of essential hooks:      '${#essential_hooks[@]}'"
-print_message 'debug' "# of target hooks:         '${#target_hooks[@]}'"
-print_message 'debug' "# of finishing hooks:      '${#finishing_hooks[@]}'"
+print_message 'debug' "# of environment hooks:                  '${#environment_hooks[@]}'"
+print_message 'debug' "# of download hooks:                     '${#download_hooks[@]}'"
+print_message 'debug' "# of extract hooks:                      '${#extract_hooks[@]}'"
+print_message 'debug' "# of essential hooks:                    '${#essential_hooks[@]}'"
+print_message 'debug' "# of target hooks:                       '${#target_hooks[@]}'"
+print_message 'debug' "# of finishing hooks:                    '${#finishing_hooks[@]}'"
 
 ################################################################################################################################
 
