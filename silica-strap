@@ -250,8 +250,8 @@ for argument in "${provided_arguments[@]}"; do
     -I=* | --install=*)
       declare -a packages_to_install+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    -F=* | --forbid=*)
-      declare -a packages_to_forbid+=($(echo "${argument#*=}" | tr ',' ' '))
+    -P=* | --prohibit=*)
+      declare -a packages_to_prohibit+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
     -R=* | --resolver=*)
       declare chosen_resolver="${argument#*=}"
@@ -899,7 +899,7 @@ if [ -z "$merged_usr_type" ]; then
 fi
 
 if [ "$merged_usr_type" = 'none' ]; then
-  declare -a packages_to_forbid+=('usrmerge')
+  declare -a packages_to_prohibit+=('usrmerge')
 fi
 
 print_message 'debug' "merged /usr type: '$merged_usr_type'"
@@ -973,16 +973,16 @@ print_message 'debug' "output file name:     '$output_file_name'"
 
 ################################################################
 
-print_message 'debug' "# of packages to include: '${#packages_to_include[@]}'"
-print_message 'debug' "# of packages to install: '${#packages_to_install[@]}'"
-print_message 'debug' "# of packages to exclude: '${#packages_to_exclude[@]}'"
-print_message 'debug' "# of packages to forbid:  '${#packages_to_forbid[@]}'"
-print_message 'debug' "# of environment hooks:   '${#environment_hooks[@]}'"
-print_message 'debug' "# of download hooks:      '${#download_hooks[@]}'"
-print_message 'debug' "# of extract hooks:       '${#extract_hooks[@]}'"
-print_message 'debug' "# of essential hooks:     '${#essential_hooks[@]}'"
-print_message 'debug' "# of target hooks:        '${#target_hooks[@]}'"
-print_message 'debug' "# of finishing hooks:     '${#finishing_hooks[@]}'"
+print_message 'debug' "# of packages to include:  '${#packages_to_include[@]}'"
+print_message 'debug' "# of packages to install:  '${#packages_to_install[@]}'"
+print_message 'debug' "# of packages to exclude:  '${#packages_to_exclude[@]}'"
+print_message 'debug' "# of packages to prohibit: '${#packages_to_prohibit[@]}'"
+print_message 'debug' "# of environment hooks:    '${#environment_hooks[@]}'"
+print_message 'debug' "# of download hooks:       '${#download_hooks[@]}'"
+print_message 'debug' "# of extract hooks:        '${#extract_hooks[@]}'"
+print_message 'debug' "# of essential hooks:      '${#essential_hooks[@]}'"
+print_message 'debug' "# of target hooks:         '${#target_hooks[@]}'"
+print_message 'debug' "# of finishing hooks:      '${#finishing_hooks[@]}'"
 
 ################################################################################################################################
 
@@ -1288,15 +1288,15 @@ if [ "${#packages_to_include[@]}" != '0' ]; then
   declare -a initial_package_set=($(echo "${initial_package_set[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
 fi
 
-if [ "${#packages_to_forbid[@]}" != '0' ]; then
-  declare -a packages_to_forbid=($(echo "${packages_to_forbid[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-  print_message 'debug' "creating temporary file '$workspace/99-forbidden-packages'"
-  cat << preferences >> "$workspace/99-forbidden-packages"
-Package: ${packages_to_forbid[@]}
+if [ "${#packages_to_prohibit[@]}" != '0' ]; then
+  declare -a packages_to_prohibit=($(echo "${packages_to_prohibit[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
+  print_message 'debug' "creating temporary file '$workspace/99-prohibited-packages'"
+  cat << preferences >> "$workspace/99-prohibited-packages"
+Package: ${packages_to_prohibit[@]}
 Pin: release *
 Pin-Priority: -10
 preferences
-  declare -a packages_to_exclude+=(${packages_to_forbid[@]})
+  declare -a packages_to_exclude+=(${packages_to_prohibit[@]})
 fi
 
 if [ "${#packages_to_exclude[@]}" != '0' ]; then
@@ -1334,9 +1334,9 @@ esac
 
 case "$resolver" in
   'apt')
-    if [ -f "$workspace/99-forbidden-packages" ]; then
-      print_message 'debug' "copying '$workspace/99-forbidden-packages' to '$environment/etc/apt/preferences.d/99-forbidden-packages'"
-      cp "$workspace/99-forbidden-packages" "$environment/etc/apt/preferences.d/99-forbidden-packages"
+    if [ -f "$workspace/99-prohibited-packages" ]; then
+      print_message 'debug' "copying '$workspace/99-prohibited-packages' to '$environment/etc/apt/preferences.d/99-prohibited-packages'"
+      cp "$workspace/99-prohibited-packages" "$environment/etc/apt/preferences.d/99-prohibited-packages"
     fi
     print_message 'debug' 'running apt inside the environment to calculate dependencies.'
     declare apt_results="$(
@@ -1357,9 +1357,9 @@ apt-get \
   install $(echo "${initial_package_set[@]}")
 " 2> /dev/stdout
     )"
-    if [ -f "$environment/etc/apt/preferences.d/99-forbidden-packages" ]; then
-      print_message 'debug' "removing temporary file '$environment/etc/apt/preferences.d/99-forbidden-packages'"
-      rm "$environment/etc/apt/preferences.d/99-forbidden-packages"
+    if [ -f "$environment/etc/apt/preferences.d/99-prohibited-packages" ]; then
+      print_message 'debug' "removing temporary file '$environment/etc/apt/preferences.d/99-prohibited-packages'"
+      rm "$environment/etc/apt/preferences.d/99-prohibited-packages"
     fi
     declare -a target_package_set=(
       $(
@@ -1405,7 +1405,7 @@ apt-get \
             fi
             ;;
         esac
-        for package in "${packages_to_forbid[@]}"; do
+        for package in "${packages_to_prohibit[@]}"; do
           if [ "$package" = "${input_packages[key]}" ]; then
             print_message 'debug' "ignoring '${input_packages[key]}'"
             unset input_packages[key]
@@ -1869,7 +1869,7 @@ case "$packages_to_extract" in
             fi
             ;;
         esac
-        for package in "${packages_to_forbid[@]}"; do
+        for package in "${packages_to_prohibit[@]}"; do
           if [ "$package" = "${initial_essential_subset[key]}" ]; then
             print_message 'debug' "ignoring essential package '${initial_essential_subset[key]}'"
             unset initial_essential_subset[key]
@@ -2268,9 +2268,9 @@ fi
 
 ################################################################
 
-if [ -f "$workspace/99-forbidden-packages" ]; then
-  print_message 'debug' "copying '$workspace/99-forbidden-packages' to '$target/etc/apt/preferences.d/99-forbidden-packages'"
-  cp "$workspace/99-forbidden-packages" "$target/etc/apt/preferences.d/99-forbidden-packages"
+if [ -f "$workspace/99-prohibited-packages" ]; then
+  print_message 'debug' "copying '$workspace/99-prohibited-packages' to '$target/etc/apt/preferences.d/99-prohibited-packages'"
+  cp "$workspace/99-prohibited-packages" "$target/etc/apt/preferences.d/99-prohibited-packages"
 fi
 
 ################################################################
@@ -2322,12 +2322,12 @@ done
 
 ################################################################
 
-if [ -f "$target/etc/apt/preferences.d/99-forbidden-packages" ]; then
+if [ -f "$target/etc/apt/preferences.d/99-prohibited-packages" ]; then
   if [ "$keep_apt_preferences" = 'true' ]; then
-    print_message 'debug' "not removing file '$target/etc/apt/preferences.d/99-forbidden-packages'"
+    print_message 'debug' "not removing file '$target/etc/apt/preferences.d/99-prohibited-packages'"
   else
-    print_message 'debug' "removing temporary file '$target/etc/apt/preferences.d/99-forbidden-packages'"
-    rm --force "$target/etc/apt/preferences.d/99-forbidden-packages"
+    print_message 'debug' "removing temporary file '$target/etc/apt/preferences.d/99-prohibited-packages'"
+    rm --force "$target/etc/apt/preferences.d/99-prohibited-packages"
   fi
 fi
 
