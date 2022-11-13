@@ -226,14 +226,14 @@ for argument in "${provided_arguments[@]}"; do
     -f=* | --format=*)
       declare chosen_output_format="${argument#*=}"
       ;;
-    -a=* | --arch=* | --architecture=* | --architectures=*)
-      declare -a chosen_architectures+=($(echo "${argument#*=}" | tr '[:upper:]' '[:lower:]' | tr '-' '_' | tr ',' ' '))
-      ;;
     -r=* | --release=* | --releases=*)
       declare -a suites+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
     -c=* | --comp=* | --component=* | --components=*)
       declare -a components+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
+    -a=* | --arch=* | --architecture=* | --architectures=*)
+      declare -a chosen_architectures+=($(echo "${argument#*=}" | tr '[:upper:]' '[:lower:]' | tr '-' '_' | tr ',' ' '))
       ;;
     -v=* | --variant=*)
       declare chosen_variant="${argument#*=}"
@@ -250,8 +250,17 @@ for argument in "${provided_arguments[@]}"; do
     -P=* | --prohibit=*)
       declare -a packages_to_prohibit+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
+    -m=* | --mirror=* | --mirrors=*)
+      declare -a chosen_mirrors+=($(echo "${argument#*=}" | tr ',' ' '))
+      ;;
     -R=* | --resolver=*)
       declare chosen_resolver="${argument#*=}"
+      ;;
+    --include-recommends)
+      declare include_recommends='true'
+      ;;
+    --exclude-recommends)
+      declare include_recommends='false'
       ;;
     -D=* | --downloader=*)
       declare chosen_downloader="${argument#*=}"
@@ -271,20 +280,17 @@ for argument in "${provided_arguments[@]}"; do
     --consider-non-essential=*)
       declare -a packages_to_consider_non_essential+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    -m=* | --mirror=* | --mirrors=*)
-      declare -a chosen_mirrors+=($(echo "${argument#*=}" | tr ',' ' '))
-      ;;
-    --merged-usr) # see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
+    --merged-usr)
       declare merged_usr_type='aliased-dirs'
       ;;
     --no-merged-usr)
       declare merged_usr_type='none'
       ;;
-    --include-recommends)
-      declare include_recommends='true'
+    --deb822-style)
+      declare sources_list_format='deb822-style'
       ;;
-    --exclude-recommends)
-      declare include_recommends='false'
+    --one-line-style)
+      declare sources_list_format='one-line-style'
       ;;
     --interactive)
       declare interactive_bootstrap='true'
@@ -310,9 +316,6 @@ for argument in "${provided_arguments[@]}"; do
     --finishing-hook=*)
       declare -a finishing_hooks+=("${argument#*=}")
       ;;
-    --skip-architecture-check)
-      declare skip_architecture_check='true'
-      ;;
     --print-initial)
       declare only_action_then_exit='print-initial-packages'
       ;;
@@ -328,12 +331,6 @@ for argument in "${provided_arguments[@]}"; do
     --only-extract)
       declare only_action_then_exit='extract-packages'
       ;;
-    --deb822-style)
-      declare sources_list_format='deb822-style'
-      ;;
-    --one-line-style)
-      declare sources_list_format='one-line-style'
-      ;;
     --keep-packages)
       declare keep_packages_directory='true'
       ;;
@@ -342,6 +339,9 @@ for argument in "${provided_arguments[@]}"; do
       ;;
     --keep-apt-preferences)
       declare keep_apt_preferences='true'
+      ;;
+    --skip-architecture-check)
+      declare skip_architecture_check='true'
       ;;
     *)
       print_message 'error' "unrecognized argument '$argument'"
@@ -456,6 +456,28 @@ if [ "$output_format" = 'directory' ]; then
   fi
   unset output_directory_contents
 fi
+
+################################################################
+
+if [ "${#suites[@]}" = '0' ]; then
+  print_message 'error' 'no suite(s) were provided.'
+  exit 1
+fi
+
+if ! check_primary_suite "${suites[0]}"; then
+  print_message 'error' "unrecognized suite '${suites[0]}'"
+  exit 1
+fi
+
+print_message 'debug' "suite(s):             $(for suite in "${suites[@]}"; do echo -n "'$suite'"; done | sed --expression "s/''/' '/g")"
+
+################################################################
+
+if [ "${#components[@]}" = '0' ]; then
+  declare -a components=('main')
+fi
+
+print_message 'debug' "component(s):         $(for component in "${components[@]}"; do echo -n "'$component'"; done | sed --expression "s/''/' '/g")"
 
 ################################################################
 
@@ -663,28 +685,6 @@ unset skip_architecture_check
 
 ################################################################
 
-if [ "${#suites[@]}" = '0' ]; then
-  print_message 'error' 'no suite(s) were provided.'
-  exit 1
-fi
-
-if ! check_primary_suite "${suites[0]}"; then
-  print_message 'error' "unrecognized suite '${suites[0]}'"
-  exit 1
-fi
-
-print_message 'debug' "suite(s):             $(for suite in "${suites[@]}"; do echo -n "'$suite'"; done | sed --expression "s/''/' '/g")"
-
-################################################################
-
-if [ "${#components[@]}" = '0' ]; then
-  declare -a components=('main')
-fi
-
-print_message 'debug' "component(s):         $(for component in "${components[@]}"; do echo -n "'$component'"; done | sed --expression "s/''/' '/g")"
-
-################################################################
-
 if [ -z "$chosen_variant" ]; then
   declare chosen_variant='standard'
 fi
@@ -733,6 +733,51 @@ elif [ "${#custom_package_set[@]}" != '0' ]; then
   exit 1
 fi
 
+for package in $(case_specific_packages "$variant" "${suites[0]}"); do
+  declare -a packages_to_include+=("$package")
+done
+
+if [ "$output_format" = 'tarball' ]; then
+  if [ -z "$chosen_output_file_name" ]; then
+    declare output_file_name="$(default_output_file_name "${suites[0]}" "${architectures[0]}")"
+    if [ "$output_format" = 'tarball' ]; then
+      case "$only_action_then_exit" in
+        download-packages)
+          declare output_file_name="Packages_$output_file_name"
+          ;;
+        extract-packages)
+          declare output_file_name="Extracted_$output_file_name"
+          ;;
+      esac
+    fi
+  else
+    declare output_file_name="$chosen_output_file_name"
+  fi
+fi
+
+unset chosen_output_file_name
+
+print_message 'debug' "output file name:     '$output_file_name'"
+print_message 'debug' "# of packages to include:  '${#packages_to_include[@]}'"
+print_message 'debug' "# of packages to exclude:  '${#packages_to_exclude[@]}'"
+print_message 'debug' "# of packages to prohibit: '${#packages_to_prohibit[@]}'"
+
+################################################################
+
+if [ "${#chosen_mirrors[@]}" = '0' ]; then
+  for uri in $(default_mirrors "${suites[0]}" "${architectures[0]}"); do
+    declare -a chosen_mirrors+=("$uri")
+  done
+fi
+
+for uri in "${chosen_mirrors[@]}"; do
+  declare -a mirrors+=("$(echo "$uri" | tr --squeeze-repeats '\/' | sed --expression 's/:\//:\/\//' | sed --expression 's/\/$//')")
+done
+
+unset chosen_mirrors
+
+print_message 'debug' "mirror(s): $(for uri in "${mirrors[@]}"; do echo -n "'$uri'"; done | sed --expression "s/''/' '/g")"
+
 ################################################################
 
 if [ -z "$chosen_resolver" ]; then
@@ -758,6 +803,17 @@ esac
 unset chosen_resolver
 
 print_message 'debug' "resolver:             '$resolver'"
+
+if [ -z "$include_recommends" ]; then
+  declare include_recommends='false'
+fi
+
+print_message 'debug' "include recommends: '$include_recommends'"
+
+if [ "$resolver" != 'apt' ] && [ "$include_recommends" = 'true' ]; then
+  print_message 'error' "only the resolver 'apt' supports --include-recommends"
+  exit 1
+fi
 
 ################################################################
 
@@ -858,24 +914,6 @@ print_message 'debug' "# of packages to consider non-essential: '${#packages_to_
 
 ################################################################
 
-if [ "${#chosen_mirrors[@]}" = '0' ]; then
-  for uri in $(default_mirrors "${suites[0]}" "${architectures[0]}"); do
-    declare -a chosen_mirrors+=("$uri")
-  done
-fi
-
-for uri in "${chosen_mirrors[@]}"; do
-  declare -a mirrors+=("$(echo "$uri" | tr --squeeze-repeats '\/' | sed --expression 's/:\//:\/\//' | sed --expression 's/\/$//')")
-done
-
-unset chosen_mirrors
-
-print_message 'debug' "mirror(s): $(for uri in "${mirrors[@]}"; do echo -n "'$uri'"; done | sed --expression "s/''/' '/g")"
-
-# TODO add a test for the chosen mirror and if it fails then fallback to the default mirror.
-
-################################################################
-
 # see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
 
 if [ -z "$merged_usr_type" ]; then
@@ -887,19 +925,6 @@ if [ "$merged_usr_type" = 'none' ]; then
 fi
 
 print_message 'debug' "merged /usr type: '$merged_usr_type'"
-
-################################################################
-
-if [ -z "$include_recommends" ]; then
-  declare include_recommends='false'
-fi
-
-print_message 'debug' "include recommends: '$include_recommends'"
-
-if [ "$resolver" != 'apt' ] && [ "$include_recommends" = 'true' ]; then
-  print_message 'error' "only the resolver 'apt' supports --include-recommends"
-  exit 1
-fi
 
 ################################################################
 
@@ -929,37 +954,6 @@ esac
 
 ################################################################
 
-for package in $(case_specific_packages "$variant" "${suites[0]}"); do
-  declare -a packages_to_include+=("$package")
-done
-
-if [ "$output_format" = 'tarball' ]; then
-  if [ -z "$chosen_output_file_name" ]; then
-    declare output_file_name="$(default_output_file_name "${suites[0]}" "${architectures[0]}")"
-    if [ "$output_format" = 'tarball' ]; then
-      case "$only_action_then_exit" in
-        download-packages)
-          declare output_file_name="Packages_$output_file_name"
-          ;;
-        extract-packages)
-          declare output_file_name="Extracted_$output_file_name"
-          ;;
-      esac
-    fi
-  else
-    declare output_file_name="$chosen_output_file_name"
-  fi
-fi
-
-unset chosen_output_file_name
-
-print_message 'debug' "output file name:     '$output_file_name'"
-
-################################################################
-
-print_message 'debug' "# of packages to include:  '${#packages_to_include[@]}'"
-print_message 'debug' "# of packages to exclude:  '${#packages_to_exclude[@]}'"
-print_message 'debug' "# of packages to prohibit: '${#packages_to_prohibit[@]}'"
 print_message 'debug' "# of environment hooks:    '${#environment_hooks[@]}'"
 print_message 'debug' "# of download hooks:       '${#download_hooks[@]}'"
 print_message 'debug' "# of extract hooks:        '${#extract_hooks[@]}'"
