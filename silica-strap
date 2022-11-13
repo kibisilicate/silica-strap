@@ -274,9 +274,6 @@ for argument in "${provided_arguments[@]}"; do
     -m=* | --mirror=* | --mirrors=*)
       declare -a chosen_mirrors+=($(echo "${argument#*=}" | tr ',' ' '))
       ;;
-    -H=* | --hostname=*)
-      declare chosen_hostname="${argument#*=}"
-      ;;
     --merged-usr) # see https://wiki.debian.org/Teams/Dpkg/FAQ#broken-usrmerge
       declare merged_usr_type='aliased-dirs'
       ;;
@@ -876,16 +873,6 @@ unset chosen_mirrors
 print_message 'debug' "mirror(s): $(for uri in "${mirrors[@]}"; do echo -n "'$uri'"; done | sed --expression "s/''/' '/g")"
 
 # TODO add a test for the chosen mirror and if it fails then fallback to the default mirror.
-
-################################################################
-
-if [ -z "$chosen_hostname" ]; then
-  declare hostname="$(default_hostname "${suites[0]}")"
-else
-  declare hostname="$chosen_hostname"
-fi
-
-unset chosen_hostname
 
 ################################################################
 
@@ -2334,11 +2321,13 @@ else
   rm --recursive "$all_packages"
 fi
 
-print_message 'debug' "creating default file '$target/etc/hostname' with hostname '$hostname'"
+declare hostname="$(default_hostname "${suites[0]}")"
+
+print_message 'debug' "creating default file '$target/etc/hostname'"
 
 echo "$hostname" > "$target/etc/hostname"
 
-print_message 'debug' "creating default file '$target/etc/hosts' with hostname '$hostname'"
+print_message 'debug' "creating default file '$target/etc/hosts'"
 
 cat << end_of_file > "$target/etc/hosts"
 127.0.0.1  localhost
