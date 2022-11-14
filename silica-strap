@@ -349,9 +349,6 @@ for argument in "${provided_arguments[@]}"; do
     --keep-workspace)
       declare keep_workspace_directory='true'
       ;;
-    --keep-apt-preferences)
-      declare keep_apt_preferences='true'
-      ;;
     --skip-architecture-check)
       declare skip_architecture_check='true'
       ;;
@@ -1280,12 +1277,6 @@ fi
 
 if [ "${#packages_to_prohibit[@]}" != '0' ]; then
   declare -a packages_to_prohibit=($(echo "${packages_to_prohibit[@]}" | tr ' ' '\n' | sort --unique --dictionary-order))
-  print_message 'debug' "creating temporary file '$workspace/99-prohibited-packages'"
-  cat << preferences >> "$workspace/99-prohibited-packages"
-Package: ${packages_to_prohibit[@]}
-Pin: release *
-Pin-Priority: -10
-preferences
   declare -a packages_to_exclude+=(${packages_to_prohibit[@]})
 fi
 
@@ -1324,9 +1315,13 @@ esac
 
 case "$resolver" in
   'apt')
-    if [ -f "$workspace/99-prohibited-packages" ]; then
-      print_message 'debug' "copying '$workspace/99-prohibited-packages' to '$environment/etc/apt/preferences.d/99-prohibited-packages'"
-      cp "$workspace/99-prohibited-packages" "$environment/etc/apt/preferences.d/99-prohibited-packages"
+    if [ "${#packages_to_prohibit[@]}" != '0' ]; then
+      print_message 'debug' "creating temporary file '$environment/etc/apt/preferences.d/99-prohibited-packages'"
+      cat << preferences >> "$environment/etc/apt/preferences.d/99-prohibited-packages"
+Package: ${packages_to_prohibit[@]}
+Pin: release *
+Pin-Priority: -10
+preferences
     fi
     print_message 'debug' 'running apt inside the environment to calculate dependencies.'
     declare apt_results="$(
@@ -1847,11 +1842,6 @@ case "$packages_to_extract" in
             unset initial_essential_subset[key]
             declare -a initial_essential_subset+=('perl-base')
             ;;
-#          'python3:any')
-#            print_message 'debug' "choosing 'python3' over '${initial_essential_subset[key]}'"
-#            unset initial_essential_subset[key]
-#            declare -a initial_essential_subset+=('python3')
-#            ;;
           *)
             if [ -z "$(cat "$workspace/current-package-fields" | grep --regexp="^Package: ${initial_essential_subset[key]}$")" ]; then
               print_message 'debug' "ignoring essential package '${initial_essential_subset[key]}'"
@@ -2258,13 +2248,6 @@ fi
 
 ################################################################
 
-if [ -f "$workspace/99-prohibited-packages" ]; then
-  print_message 'debug' "copying '$workspace/99-prohibited-packages' to '$target/etc/apt/preferences.d/99-prohibited-packages'"
-  cp "$workspace/99-prohibited-packages" "$target/etc/apt/preferences.d/99-prohibited-packages"
-fi
-
-################################################################
-
 for command in "${target_hooks[@]}"; do
   print_message 'debug' "running command(s) {
 $command
@@ -2283,17 +2266,6 @@ $command
     print_message 'warning' 'hook returned an error.'
   fi
 done
-
-################################################################
-
-if [ -f "$target/etc/apt/preferences.d/99-prohibited-packages" ]; then
-  if [ "$keep_apt_preferences" = 'true' ]; then
-    print_message 'debug' "not removing file '$target/etc/apt/preferences.d/99-prohibited-packages'"
-  else
-    print_message 'debug' "removing temporary file '$target/etc/apt/preferences.d/99-prohibited-packages'"
-    rm --force "$target/etc/apt/preferences.d/99-prohibited-packages"
-  fi
-fi
 
 ################################################################
 
