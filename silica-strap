@@ -494,20 +494,15 @@ if [ "${#chosen_architectures[@]}" = '0' ]; then
   declare -a chosen_architectures=("$(uname --machine)")
 fi
 
-for architecture in "${chosen_architectures[@]}"; do
-  if [ "$architecture" = 'host' ]; then
+for index in "${!chosen_architectures[@]}"; do
+  if [ "${chosen_architectures[index]}" = 'host' ]; then
     declare use_host_architectures='true'
+    unset chosen_architectures[index]
   fi
 done
 
 if [ "$use_host_architectures" = 'true' ]; then
-  if [ "${#chosen_architectures[@]}" = '1' ]; then
-    unset chosen_architectures
-    declare -a chosen_architectures=("$(uname --machine)" $(arch-test -n))
-  else
-    print_message 'error' 'unable to use host architecture(s) with the other architecture(s) provided.'
-    exit 1
-  fi
+  declare -a chosen_architectures=("$(uname --machine)" $(arch-test -n) ${chosen_architectures[@]})
 fi
 
 unset use_host_architectures
