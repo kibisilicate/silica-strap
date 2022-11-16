@@ -310,23 +310,23 @@ for argument in "${provided_arguments[@]}"; do
     --non-interactive)
       declare interactive_bootstrap='false'
       ;;
-    --environment-hook=*)
+    --hook-environment=*)
       declare -a environment_hooks+=("${argument#*=}")
       ;;
-    --download-hook=*)
+    --hook-download=*)
       declare -a download_hooks+=("${argument#*=}")
       ;;
-    --extract-hook=*)
+    --hook-extract=*)
       declare -a extract_hooks+=("${argument#*=}")
       ;;
-    --essential-hook=*)
+    --hook-essential=*)
       declare -a essential_hooks+=("${argument#*=}")
       ;;
-    --target-hook=*)
+    --hook-target=*)
       declare -a target_hooks+=("${argument#*=}")
       ;;
-    --finishing-hook=*)
-      declare -a finishing_hooks+=("${argument#*=}")
+    --hook-done=*)
+      declare -a done_hooks+=("${argument#*=}")
       ;;
     --print-initial)
       declare only_action_then_exit='print-initial-packages'
@@ -964,7 +964,7 @@ print_message 'debug' "# of download hooks:                     '${#download_hoo
 print_message 'debug' "# of extract hooks:                      '${#extract_hooks[@]}'"
 print_message 'debug' "# of essential hooks:                    '${#essential_hooks[@]}'"
 print_message 'debug' "# of target hooks:                       '${#target_hooks[@]}'"
-print_message 'debug' "# of finishing hooks:                    '${#finishing_hooks[@]}'"
+print_message 'debug' "# of done hooks:                         '${#done_hooks[@]}'"
 
 ################################################################################################################################
 
@@ -2320,7 +2320,7 @@ fi
 
 ################################################################
 
-for command in "${finishing_hooks[@]}"; do
+for command in "${done_hooks[@]}"; do
   print_message 'debug' "running command(s) {
 $command
 }"
