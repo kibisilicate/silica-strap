@@ -593,7 +593,7 @@ for architecture in "${chosen_architectures[@]}"; do
         declare ppc64el_present='true'
       fi
       ;;
-    riscv64 | risc_v | riscv)
+    riscv64)
       if [ -z "$riscv64_present" ]; then
         declare -a architectures+=('riscv64')
         declare riscv64_present='true'
@@ -703,10 +703,10 @@ case "$chosen_variant" in
   required | minbase)
     declare variant='required'
     ;;
-  buildd | build-essential)
+  buildd)
     declare variant='buildd'
     ;;
-  important | 'debootstrap')
+  important)
     declare variant='important'
     ;;
   standard)
@@ -790,7 +790,7 @@ if [ -z "$chosen_resolver" ]; then
 fi
 
 case "$chosen_resolver" in
-  'apt' | 'apt-get')
+  'apt')
     declare resolver='apt'
     ;;
   internal)
@@ -841,7 +841,7 @@ if [ -z "$chosen_downloader" ]; then
 fi
 
 case "$chosen_downloader" in
-  'apt' | 'apt-get')
+  'apt')
     declare downloader='apt'
     ;;
   'curl')
