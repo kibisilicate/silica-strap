@@ -697,10 +697,7 @@ case "$chosen_variant" in
   essential)
     declare variant='essential'
     ;;
-  apt-essential | 'apt')
-    declare variant='apt-essential'
-    ;;
-  required | minbase)
+  required)
     declare variant='required'
     ;;
   buildd)
@@ -1210,11 +1207,6 @@ case "$variant" in
         case "$variant" in
           essential)
             awk '/\nEssential: yes\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
-            echo 'Package: mawk'
-            ;;
-          apt-essential)
-            awk '/\nEssential: yes\n/' RS='' ORS='\n\n' "$workspace/primary_package_list"
-            echo 'Package: apt'
             echo 'Package: mawk'
             ;;
           required)
