@@ -1,7 +1,5 @@
 #! /usr/bin/env bash
 
-if ! ./scripts/install.sh > /dev/null; then exit 1; fi
-
 declare my_format='directory'
 #declare my_format='tarball'
 
@@ -88,9 +86,7 @@ silica-strap \
   --resolver="$my_resolver" \
   --downloader="$my_downloader" \
   --extractor="$my_extractor" \
-  $(echo "$@") \
-  #--environment-hook="nano \"\$ENVIRONMENT/etc/apt/sources.list.d/sources.sources\"" \
-  #--target-hook="chroot \"\$TARGET\" /usr/bin/env --ignore-environment bash -c \"export HOME='/root'; export TERM='$TERM'; bash --login\""
+  $(echo "$@")
 
 if [ "$?" = '0' ]; then
   exit 0
