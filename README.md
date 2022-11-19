@@ -16,7 +16,7 @@ silica-strap was created as an alternative to debootstrap and mmdebstrap.
 Clone the repository and enter directory.
 
 ```
-# git clone https://github.com/silica-dev/silica-strap
+# git clone https://github.com/kibisilicate/silica-strap.git
 
 # cd ./silica-strap
 ```
