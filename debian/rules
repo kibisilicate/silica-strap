@@ -1,4 +1,7 @@
 #! /usr/bin/make -f
+
+DESTDIR=$(CURDIR)/debian/silica-strap
+
 %:
 	dh $@
 
