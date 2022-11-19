@@ -21,10 +21,12 @@ Clone the repository and enter directory.
 # cd ./silica-strap
 ```
 
-Run the install script with sudo or as root.
+Then run with sudo or as root.
 
 ```
-# ./scripts/install.sh
+# make
+
+# make install
 ```
 
 ## Usage
