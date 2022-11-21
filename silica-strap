@@ -1653,7 +1653,7 @@ if [ "$only_action_then_exit" = 'download-packages' ]; then
       mv "$workspace/$output_file_name.tar" "$output_directory"
       ;;
   esac
-  echo 'Base system package download complete.'
+  print_message 'info' 'package download complete.'
   exit 0
 fi
 
@@ -2114,7 +2114,7 @@ if [ "$only_action_then_exit" = 'extract-packages' ]; then
       mv "$workspace/$output_file_name.tar" "$output_directory"
       ;;
   esac
-  echo 'Base system package extraction complete.'
+  print_message 'info' 'package extraction complete.'
   exit 0
 fi
 
@@ -2354,5 +2354,5 @@ case "$output_format" in
     ;;
 esac
 
-echo 'Base system install complete.'
+print_message 'info' 'bootstrap complete.'
 
