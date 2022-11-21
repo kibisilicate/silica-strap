@@ -46,7 +46,6 @@ declare -a my_architectures=(
 )
 
 #declare my_variant='essential'
-#declare my_variant='apt-essential'
 declare my_variant='required'
 #declare my_variant='buildd'
 #declare my_variant='important'
