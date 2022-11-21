@@ -159,8 +159,12 @@ if [ "$(whoami)" != 'root' ]; then
   exit 1
 fi
 
-if [ -n "$SILICA_STRAP_DEBUG" ]; then
-  declare debug_output='true'
+if [ -z "$debug_output" ]; then
+  if [ "$SILICA_STRAP_DEBUG" = 'true' ]; then
+    declare debug_output='true'
+  else
+    declare debug_output='false'
+  fi
 fi
 
 if [ "$print_usage_then_exit" = 'true' ]; then
