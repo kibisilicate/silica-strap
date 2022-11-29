@@ -29,31 +29,32 @@ declare debian_obsolete_mirror='http://archive.debian.org/debian'
 
 declare -a ubuntu_current_suites=(
   'devel'
-  'kinetic'
-  'jammy'
-  'impish'
-  'hirsute'
-  'focal'
-  'bionic'
-  'xenial'
-  'trusty'
+  'lunar'   # 23.04
+  'kinetic' # 22.10
+  'jammy'   # 22.04 LTS
+  'focal'   # 20.04 LTS
+  'bionic'  # 18.04 LTS
+  'xenial'  # 16.04 LTS
+  'trusty'  # 14.04 LTS
 )
 
 declare -a ubuntu_obsolete_suites=(
-  'groovy'
-  'eoan'
-  'disco'
-  'cosmic'
-  'artful'
-  'zesty'
-  'yakkety'
-  'wily'
-  'vivid'
-  'utopic'
-  'saucy'
-  'raring'
-  'quantal'
-  'precise'
+  'impish'  # 21.10
+  'hirsute' # 21.04
+  'groovy'  # 20.10
+  'eoan'    # 19.10
+  'disco'   # 19.04
+  'cosmic'  # 18.10
+  'artful'  # 17.10
+  'zesty'   # 17.04
+  'yakkety' # 16.10
+  'wily'    # 15.10
+  'vivid'   # 15.04
+  'utopic'  # 14.10
+  'saucy'   # 13.10
+  'raring'  # 13.04
+  'quantal' # 12.10
+  'precise' # 12.04 LTS
 )
 
 declare ubuntu_current_mirror='http://archive.ubuntu.com/ubuntu'
