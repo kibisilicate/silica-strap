@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-declare version='0.1'
+declare version='0.1.0'
 
 if [ -z "$1" ]; then
   declare print_usage_then_exit='true'
