@@ -2048,26 +2048,35 @@ case "$sources_list_format" in
       mkdir "$target/etc/apt/sources.list.d"
     fi
     print_message 'debug' "creating a deb822-style sources list '$target/etc/apt/sources.list.d/sources.sources'"
-    cat << sources > "$target/etc/apt/sources.list.d/sources.sources"
-Types: deb
+    cat << end_of_file > "$target/etc/apt/sources.list.d/sources.sources"
+Types: deb deb-src
 URIs: ${mirrors[@]}
 Suites: ${suites[@]}
 Components: ${components[@]}
-sources
+end_of_file
     ;;
   one-line-style)
     print_message 'debug' "creating a one-line-style sources list '$target/etc/apt/sources.list'"
-    let counter='0'
+    let mirror_counter='0'
     for mirror in "${mirrors[@]}"; do
+      let mirror_counter+='1'
+      if [ $mirror_counter != '1' ]; then
+        echo '' >> "$target/etc/apt/sources.list"
+      fi
+      let suite_counter='0'
       for suite in "${suites[@]}"; do
-        let counter+='1'
-        if [ "$counter" != '1' ]; then
+        let suite_counter+='1'
+        if [ "$suite_counter" != '1' ]; then
           echo '' >> "$target/etc/apt/sources.list"
         fi
-        echo "deb $mirrors $suite ${components[@]}" >> "$target/etc/apt/sources.list"
+        cat << end_of_file >> "$target/etc/apt/sources.list"
+deb-src $mirror $suite ${components[@]}
+deb $mirror $suite ${components[@]}
+end_of_file
       done
-      unset counter
+      unset suite_counter
     done
+    unset mirror_counter
     ;;
 esac
 
