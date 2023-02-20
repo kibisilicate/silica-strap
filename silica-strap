@@ -2024,7 +2024,7 @@ print_message 'debug' "creating default file '$target/var/lib/dpkg/arch'"
 for architecture in "${architectures[@]}"; do
   print_message 'debug' "adding architecture '$architecture' to '$target/var/lib/dpkg/arch'"
   echo "$architecture" >> "$target/var/lib/dpkg/arch"
-fi
+done
 
 ################################################################
 
