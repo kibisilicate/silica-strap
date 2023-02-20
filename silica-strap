@@ -2014,16 +2014,16 @@ chown root:root "$target/etc/fstab"
 
 chmod 0644 "$target/etc/fstab"
 
-if [ "${#architectures[@]}" != '1' ]; then
-  let counter='0'
-  for architecture in "${architectures[@]}"; do
-    let counter+='1'
-    if [ "$counter" != '1' ]; then
-      print_message 'debug' "adding architecture '$architecture' to '$target/var/lib/dpkg/arch'"
-      echo "$architecture" >> "$target/var/lib/dpkg/arch"
-    fi
-  done
-  unset counter
+if [ -f "$target/var/lib/dpkg/arch" ]; then
+  print_message 'debug' "removing file '$target/var/lib/dpkg/arch'"
+  rm --force "$target/var/lib/dpkg/arch"
+fi
+
+print_message 'debug' "creating default file '$target/var/lib/dpkg/arch'"
+
+for architecture in "${architectures[@]}"; do
+  print_message 'debug' "adding architecture '$architecture' to '$target/var/lib/dpkg/arch'"
+  echo "$architecture" >> "$target/var/lib/dpkg/arch"
 fi
 
 ################################################################
